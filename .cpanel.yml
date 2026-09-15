@@ -2,5 +2,4 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/ccxkbsat/attendance-system
-    - /bin/cp -R . $DEPLOYPATH
     - cd $DEPLOYPATH && npm install --production
