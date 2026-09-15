@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1e293b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Jelenlét – Terminál</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  :root {
+    --primary: #3b82f6; --success: #22c55e; --danger: #ef4444;
+    --bg: #0f172a; --card: #1e293b; --surface: #334155;
+    --text: #f1f5f9; --muted: #94a3b8; --border: #475569;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* Header */
+  .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 15px; font-weight: 600; }
+  .header .time { font-size: 13px; color: var(--muted); }
+  .header .nfc-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .nfc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .nfc-dot.active { background: var(--success); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* Main content */
+  .main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; max-width: 480px; margin: 0 auto; width: 100%; }
+
+  /* Screen management */
+  .screen { display: none; flex-direction: column; gap: 12px; }
+  .screen.active { display: flex; }
+
+  /* NFC Screen */
+  .nfc-area { background: var(--card); border-radius: 16px; padding: 32px 20px; text-align: center; border: 2px dashed var(--border); }
+  .nfc-icon { font-size: 64px; margin-bottom: 12px; }
+  .nfc-area h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .nfc-area p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .nfc-area.scanning { border-color: var(--primary); animation: border-pulse 1.5s infinite; }
+  @keyframes border-pulse { 0%,100%{border-color:var(--primary)} 50%{border-color:var(--border)} }
+
+  /* QR Scanner */
+  .qr-area { background: #000; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 1; }
+  #video { width: 100%; height: 100%; object-fit: cover; }
+  .qr-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .qr-frame { width: 65%; aspect-ratio: 1; border: 3px solid var(--primary); border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); position: relative; }
+  .qr-frame::before, .qr-frame::after { content: ''; position: absolute; width: 20px; height: 20px; }
+  .scan-line { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--primary); animation: scan 2s linear infinite; }
+  @keyframes scan { 0%{top:0} 100%{top:100%} }
+
+  /* PIN Screen */
+  .emp-card { background: var(--card); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; }
+  .emp-avatar { width: 48px; height: 48px; border-radius: 12px; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
+  .emp-info h3 { font-size: 16px; font-weight: 600; }
+  .emp-info p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .pin-display { text-align: center; padding: 12px; }
+  .pin-dots { display: flex; gap: 12px; justify-content: center; margin-bottom: 8px; }
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); transition: all 0.15s; }
+  .pin-dot.filled { background: var(--primary); border-color: var(--primary); transform: scale(1.1); }
+  .pin-label { font-size: 12px; color: var(--muted); }
+
+  .pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pin-btn { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; font-size: 22px; font-weight: 600; cursor: pointer; transition: all 0.1s; color: var(--text); aspect-ratio: 1.3; display: flex; align-items: center; justify-content: center; }
+  .pin-btn:active { background: var(--surface); transform: scale(0.95); }
+  .pin-btn.del { font-size: 16px; color: var(--muted); }
+  .pin-btn.submit { background: var(--primary); border-color: var(--primary); font-size: 14px; }
+  .pin-btn.submit:active { background: #2563eb; }
+
+  /* Result Screen */
+  .result-card { border-radius: 16px; padding: 32px 20px; text-align: center; }
+  .result-card.success { background: linear-gradient(135deg, #14532d, #166534); border: 1px solid #22c55e44; }
+  .result-card.error   { background: linear-gradient(135deg, #7f1d1d, #991b1b); border: 1px solid #ef444444; }
+  .result-icon { font-size: 56px; margin-bottom: 12px; }
+  .result-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .result-card p { color: rgba(255,255,255,0.7); font-size: 14px; }
+  .result-detail { margin-top: 16px; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 12px; font-size: 13px; }
+  .result-detail .time-big { font-size: 32px; font-weight: 700; margin: 4px 0; }
+
+  /* Buttons */
+  .btn { display: block; width: 100%; padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; text-align: center; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-outline { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .btn-success { background: var(--success); color: #fff; }
+
+  /* Mode selector */
+  .mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mode-tab { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .mode-tab.active { background: var(--primary); border-color: var(--primary); }
+  .mode-tab .icon { font-size: 24px; display: block; margin-bottom: 4px; }
+  .mode-tab .label { font-size: 12px; font-weight: 600; }
+
+  /* Section title */
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 4px 0; }
+
+  /* Alert */
+  .alert { padding: 12px 16px; border-radius: 10px; font-size: 13px; background: #7f1d1d44; border: 1px solid var(--danger); color: #fca5a5; }
+
+  /* Shimmer / loading */
+  .loading { text-align: center; color: var(--muted); font-size: 13px; padding: 20px; }
+
+  /* NFC tag type indicator */
+  .tag-banner { padding: 12px 16px; border-radius: 12px; text-align: center; font-size: 14px; font-weight: 600; }
+  .tag-entry { background: #14532d44; border: 1px solid #22c55e44; color: #86efac; }
+  .tag-exit  { background: #1e3a5f44; border: 1px solid #3b82f644; color: #93c5fd; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏢 Jelenlét Terminál</h1>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="nfc-indicator" id="nfc-indicator">
+      <div class="nfc-dot" id="nfc-dot"></div>
+      <span id="nfc-status" style="font-size:11px;color:var(--muted)">NFC</span>
+    </div>
+    <div class="time" id="clock">--:--</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Screen 1: Mode selection / NFC waiting -->
+  <div class="screen active" id="screen-start">
+    <div class="section-title">Azonosítás módja</div>
+    <div class="mode-tabs">
+      <div class="mode-tab active" id="mode-nfc" onclick="setMode('nfc')">
+        <span class="icon">📡</span><span class="label">NFC Tag</span>
+      </div>
+      <div class="mode-tab" id="mode-qr" onclick="setMode('qr')">
+        <span class="icon">📷</span><span class="label">QR Kód</span>
+      </div>
+    </div>
+
+    <!-- NFC mode -->
+    <div id="nfc-screen">
+      <div class="nfc-area" id="nfc-area">
+        <div class="nfc-icon">📡</div>
+        <h2>Tartsa a taget a telefonhoz</h2>
+        <p>NFC tag beolvasásával azonosítja magát<br>a belépési vagy kilépési tagnél</p>
+      </div>
+      <div style="text-align:center;color:var(--muted);font-size:12px">— vagy —</div>
+      <button class="btn btn-outline" onclick="skipToQrPin()">QR + PIN azonosítás</button>
+    </div>
+
+    <!-- QR mode -->
+    <div id="qr-screen" style="display:none">
+      <div class="qr-area">
+        <video id="video" autoplay playsinline muted></video>
+        <div class="qr-overlay"><div class="qr-frame"><div class="scan-line"></div></div></div>
+      </div>
+      <p style="text-align:center;font-size:12px;color:var(--muted)">Tartsa a QR kódot a keret elé</p>
+      <div id="qr-error" class="alert" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Screen 2: PIN entry -->
+  <div class="screen" id="screen-pin">
+    <div id="tag-banner" style="display:none" class="tag-banner"></div>
+    <div class="emp-card" id="emp-card">
+      <div class="emp-avatar" id="emp-avatar">?</div>
+      <div class="emp-info">
+        <h3 id="emp-name-display">–</h3>
+        <p id="emp-dept-display">–</p>
+      </div>
+    </div>
+    <div class="pin-display">
+      <div class="pin-dots" id="pin-dots">
+        <div class="pin-dot" id="d0"></div>
+        <div class="pin-dot" id="d1"></div>
+        <div class="pin-dot" id="d2"></div>
+        <div class="pin-dot" id="d3"></div>
+      </div>
+      <div class="pin-label">Adja meg PIN kódját</div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinKey('1')">1</button>
+      <button class="pin-btn" onclick="pinKey('2')">2</button>
+      <button class="pin-btn" onclick="pinKey('3')">3</button>
+      <button class="pin-btn" onclick="pinKey('4')">4</button>
+      <button class="pin-btn" onclick="pinKey('5')">5</button>
+      <button class="pin-btn" onclick="pinKey('6')">6</button>
+      <button class="pin-btn" onclick="pinKey('7')">7</button>
+      <button class="pin-btn" onclick="pinKey('8')">8</button>
+      <button class="pin-btn" onclick="pinKey('9')">9</button>
+      <button class="pin-btn del" onclick="pinDel()">⌫</button>
+      <button class="pin-btn" onclick="pinKey('0')">0</button>
+      <button class="pin-btn submit" onclick="submitPin()">✓</button>
+    </div>
+    <div id="pin-error" class="alert" style="display:none"></div>
+    <button class="btn btn-outline" onclick="goBack()" style="margin-top:4px">← Vissza</button>
+  </div>
+
+  <!-- Screen 3: Manual QR code input (without camera) -->
+  <div class="screen" id="screen-manual-qr">
+    <div style="background:var(--card);border-radius:12px;padding:20px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">QR kód kézi megadása</div>
+      <input type="text" id="manual-qr-input" placeholder="pl. EMP-001"
+        style="width:100%;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;letter-spacing:2px;text-transform:uppercase"
+        oninput="this.value = this.value.toUpperCase()">
+      <button class="btn btn-primary" style="margin-top:12px" onclick="submitManualQR()">Tovább →</button>
+    </div>
+    <button class="btn btn-outline" onclick="goBack()">← Vissza</button>
+  </div>
+
+  <!-- Screen 4: Result -->
+  <div class="screen" id="screen-result">
+    <div class="result-card" id="result-card">
+      <div class="result-icon" id="result-icon">✅</div>
+      <h2 id="result-title">Sikeres</h2>
+      <p id="result-msg"></p>
+      <div class="result-detail">
+        <div id="result-name" style="font-weight:600"></div>
+        <div class="time-big" id="result-time"></div>
+        <div id="result-date" style="font-size:12px;color:rgba(255,255,255,0.5)"></div>
+      </div>
+    </div>
+    <button class="btn btn-outline" onclick="resetTerminal()">← Új azonosítás</button>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+const API_BASE = window.location.origin;
+let currentQR = null;
+let currentNfcTag = null;
+let pinBuffer = '';
+let mode = 'nfc';
+let scanActive = false;
+let videoStream = null;
+let scanInterval = null;
+let nfcReader = null;
+
+// Telephely azonosítás URL alapján (?telephely=BP-01)
+let currentLocation = null;
+async function initLocation() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('telephely') || params.get('loc') || params.get('location');
+  if (!code) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/locations/public`);
+    const locs = await res.json();
+    // Keresés kód vagy ID alapján
+    const loc = locs.find(l => l.code === code || l._id === code);
+    if (loc) {
+      currentLocation = loc;
+      document.querySelector('.header h1').textContent = `🏢 ${loc.name}`;
+      document.title = `Terminál – ${loc.name}`;
+    } else {
+      // Ismeretlen kód, de megjelenítjük
+      document.querySelector('.header h1').textContent = `🏢 ${code}`;
+    }
+  } catch(e) { console.warn('Location init error', e); }
+}
+
+// === Clock ===
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('hu-HU', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// === NFC ===
+async function initNfc() {
+  if (!('NDEFReader' in window)) {
+    document.getElementById('nfc-status').textContent = 'Nem támogatott';
+    document.getElementById('nfc-dot').style.background = '#ef4444';
+    return;
+  }
+  try {
+    nfcReader = new NDEFReader();
+    await nfcReader.scan();
+    document.getElementById('nfc-dot').classList.add('active');
+    document.getElementById('nfc-status').textContent = 'Aktív';
+    document.getElementById('nfc-area').classList.add('scanning');
+
+    nfcReader.addEventListener('reading', ({ message, serialNumber }) => {
+      let tagId = null;
+      for (const record of message.records) {
+        if (record.recordType === 'text') {
+          const textDecoder = new TextDecoder(record.encoding || 'utf-8');
+          tagId = textDecoder.decode(record.data).trim();
+        }
+      }
+      if (!tagId) tagId = serialNumber; // fallback: serial number
+      onNfcRead(tagId);
+    });
+  } catch (err) {
+    console.warn('NFC init error:', err);
+    document.getElementById('nfc-status').textContent = 'Hiba';
+  }
+}
+
+async function onNfcRead(tagId) {
+  currentNfcTag = tagId;
+  // Check tag type
+  try {
+    const res = await fetch(`${API_BASE}/api/attendance/nfc-scan`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tagId })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // Show tag banner
+      showTagBanner(data.tag);
+    }
+  } catch(e) {}
+  skipToQrPin();
+}
+
+function showTagBanner(tag) {
+  const banner = document.getElementById('tag-banner');
+  if (tag) {
+    banner.className = 'tag-banner ' + (tag.type === 'entry' ? 'tag-entry' : 'tag-exit');
+    banner.textContent = (tag.type === 'entry' ? '✅ Érkezés – ' : '🚪 Távozás – ') + tag.locationName;
+    banner.style.display = 'block';
+  }
+}
+
+// === MODE ===
+function setMode(m) {
+  mode = m;
+  document.getElementById('mode-nfc').classList.toggle('active', m === 'nfc');
+  document.getElementById('mode-qr').classList.toggle('active', m === 'qr');
+  document.getElementById('nfc-screen').style.display = m === 'nfc' ? 'block' : 'none';
+  document.getElementById('qr-screen').style.display  = m === 'qr'  ? 'block' : 'none';
+  if (m === 'qr') startQRScanner();
+  else stopQRScanner();
+}
+
+// === QR SCANNER ===
+async function startQRScanner() {
+  scanActive = true;
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video = document.getElementById('video');
+    video.srcObject = videoStream;
+    video.play();
+    video.addEventListener('loadedmetadata', () => {
+      scanInterval = setInterval(() => scanQRFrame(video), 200);
+    });
+  } catch(e) {
+    document.getElementById('qr-error').textContent = 'Kamera hozzáférés megtagadva. Engedélyezze a kamerát.';
+    document.getElementById('qr-error').style.display = 'block';
+  }
+}
+
+function stopQRScanner() {
+  scanActive = false;
+  clearInterval(scanInterval);
+  if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+}
+
+function scanQRFrame(video) {
+  if (!scanActive || !video.videoWidth) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const imgData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+  const code = jsQR(imgData.data, imgData.width, imgData.height);
+  if (code && code.data) {
+    stopQRScanner();
+    onQRRead(code.data.trim());
+  }
+}
+
+function onQRRead(qrCode) {
+  currentQR = qrCode.toUpperCase();
+  showPinScreen(null); // No employee info yet, will fetch after PIN
+}
+
+function skipToQrPin() {
+  stopQRScanner();
+  showScreen('screen-manual-qr');
+}
+
+function submitManualQR() {
+  const val = document.getElementById('manual-qr-input').value.trim().toUpperCase();
+  if (!val) return;
+  currentQR = val;
+  document.getElementById('manual-qr-input').value = '';
+  showPinScreen(null);
+}
+
+// === PIN ===
+function showPinScreen(employee) {
+  pinBuffer = '';
+  updatePinDots();
+  document.getElementById('pin-error').style.display = 'none';
+  if (employee) {
+    document.getElementById('emp-avatar').textContent = employee.name.charAt(0);
+    document.getElementById('emp-name-display').textContent = employee.name;
+    document.getElementById('emp-dept-display').textContent = employee.department || '';
+  } else {
+    document.getElementById('emp-avatar').textContent = '?';
+    document.getElementById('emp-name-display').textContent = 'Azonosítás...';
+    document.getElementById('emp-dept-display').textContent = 'PIN megadása után';
+  }
+  showScreen('screen-pin');
+}
+
+function pinKey(k) {
+  if (pinBuffer.length >= 8) return;
+  pinBuffer += k;
+  updatePinDots();
+  if (pinBuffer.length >= 4) {
+    // Auto-submit after 6 digits or wait
+  }
+}
+
+function pinDel() { pinBuffer = pinBuffer.slice(0, -1); updatePinDots(); }
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('d' + i).classList.toggle('filled', i < pinBuffer.length);
+  }
+}
+
+async function submitPin() {
+  if (pinBuffer.length < 4) {
+    showPinError('Legalább 4 számjegy szükséges');
+    return;
+  }
+  const body = {
+    qrCode: currentQR, pin: pinBuffer, nfcTagId: currentNfcTag,
+    locationId:   currentLocation?._id   || null,
+    locationName: currentLocation?.name  || null,
+  };
+  try {
+    const res = await fetch(`${API_BASE}/api/attendance/identify`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    pinBuffer = '';
+    updatePinDots();
+    if (res.ok) showResult(true, data);
+    else showResult(false, data);
+  } catch(e) {
+    showPinError('Kapcsolódási hiba. Ellenőrizze a hálózatot.');
+  }
+}
+
+function showPinError(msg) {
+  const el = document.getElementById('pin-error');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+// === RESULT ===
+function showResult(success, data) {
+  const card = document.getElementById('result-card');
+  card.className = 'result-card ' + (success ? 'success' : 'error');
+  document.getElementById('result-icon').textContent = success ? (data.eventType === 'checkin' ? '✅' : '🚪') : '❌';
+  document.getElementById('result-title').textContent = success ? data.message : 'Sikertelen';
+  document.getElementById('result-msg').textContent = success ? '' : (data.error || 'Hiba történt');
+  if (success && data.employee) {
+    document.getElementById('result-name').textContent = data.employee.name + ' – ' + (data.employee.department || '');
+    const now = new Date(data.timestamp);
+    document.getElementById('result-time').textContent = now.toLocaleTimeString('hu-HU', {hour:'2-digit', minute:'2-digit'});
+    document.getElementById('result-date').textContent = now.toLocaleDateString('hu-HU', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  } else {
+    document.getElementById('result-name').textContent = '';
+    document.getElementById('result-time').textContent = '';
+    document.getElementById('result-date').textContent = '';
+  }
+  showScreen('screen-result');
+  if (success) setTimeout(resetTerminal, 5000);
+}
+
+// === NAVIGATION ===
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goBack() {
+  currentQR = null;
+  currentNfcTag = null;
+  pinBuffer = '';
+  document.getElementById('tag-banner').style.display = 'none';
+  showScreen('screen-start');
+  if (mode === 'qr') startQRScanner();
+}
+
+function resetTerminal() {
+  currentQR = null;
+  currentNfcTag = null;
+  pinBuffer = '';
+  document.getElementById('tag-banner').style.display = 'none';
+  document.getElementById('manual-qr-input').value = '';
+  showScreen('screen-start');
+  if (mode === 'qr') startQRScanner();
+}
+
+// === KEYBOARD SUPPORT (kiosk mode) ===
+document.addEventListener('keydown', e => {
+  const screen = document.querySelector('.screen.active')?.id;
+  if (screen === 'screen-pin') {
+    if (e.key >= '0' && e.key <= '9') pinKey(e.key);
+    else if (e.key === 'Backspace') pinDel();
+    else if (e.key === 'Enter') submitPin();
+  }
+});
+
+// Init
+initLocation().then(() => initNfc());
+</script>
+</body>
+</html>

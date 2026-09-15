@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jelenlét Nyilvántartó – Admin</title>
+<style>
+  :root {
+    --primary: #2563eb; --primary-dark: #1d4ed8; --primary-light: #dbeafe;
+    --success: #16a34a; --success-light: #dcfce7;
+    --danger: #dc2626; --danger-light: #fee2e2;
+    --warning: #d97706; --warning-light: #fef3c7;
+    --gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;
+    --gray-300:#d1d5db;--gray-500:#6b7280;--gray-700:#374151;--gray-900:#111827;
+    --sidebar-w: 248px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--gray-50); color:var(--gray-900); display:flex; height:100vh; overflow:hidden; }
+
+  /* Sidebar */
+  #sidebar { width:var(--sidebar-w); background:#1e293b; color:#e2e8f0; display:flex; flex-direction:column; flex-shrink:0; overflow-y:auto; }
+  .sidebar-logo { padding:18px 16px; border-bottom:1px solid #334155; }
+  .sidebar-logo h1 { font-size:13px; font-weight:700; color:#fff; }
+  .sidebar-logo p  { font-size:11px; color:#94a3b8; margin-top:2px; }
+  .nav-section { padding:6px 0; }
+  .nav-label { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; padding:10px 16px 4px; font-weight:600; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 16px; cursor:pointer; font-size:13px; color:#94a3b8; transition:all .15s; border-left:3px solid transparent; }
+  .nav-item:hover { background:#334155; color:#e2e8f0; }
+  .nav-item.active { background:#1e40af22; color:#60a5fa; border-left-color:#3b82f6; }
+  .nav-item .icon { font-size:15px; width:20px; text-align:center; }
+  .sidebar-footer { margin-top:auto; padding:12px 16px; border-top:1px solid #334155; }
+  .user-info { font-size:12px; color:#94a3b8; }
+  .user-info strong { display:block; color:#e2e8f0; font-size:13px; }
+  .btn-logout { margin-top:8px; font-size:12px; color:#f87171; cursor:pointer; background:none; border:none; padding:0; }
+
+  /* Main */
+  #main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .topbar { background:#fff; border-bottom:1px solid var(--gray-200); padding:11px 24px; display:flex; align-items:center; justify-content:space-between; }
+  .topbar h2 { font-size:17px; font-weight:600; }
+  .topbar-actions { display:flex; gap:8px; align-items:center; }
+  .content { flex:1; overflow-y:auto; padding:20px 24px; }
+
+  /* Stats */
+  .stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+  .stat-card { background:#fff; border-radius:10px; padding:14px 16px; border:1px solid var(--gray-200); }
+  .stat-card .label { font-size:11px; color:var(--gray-500); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+  .stat-card .value { font-size:26px; font-weight:700; margin:3px 0 1px; }
+  .stat-card .sub   { font-size:11px; color:var(--gray-500); }
+
+  /* Buttons */
+  .btn { display:inline-flex; align-items:center; gap:5px; padding:7px 13px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; border:none; transition:all .15s; text-decoration:none; }
+  .btn-primary { background:var(--primary); color:#fff; }
+  .btn-primary:hover { background:var(--primary-dark); }
+  .btn-danger  { background:var(--danger); color:#fff; }
+  .btn-outline { background:#fff; color:var(--gray-700); border:1px solid var(--gray-300); }
+  .btn-outline:hover { background:var(--gray-50); }
+  .btn-sm { padding:5px 10px; font-size:12px; }
+
+  /* Cards & Tables */
+  .card { background:#fff; border-radius:10px; border:1px solid var(--gray-200); overflow:hidden; margin-bottom:16px; }
+  .card-header { padding:13px 18px; border-bottom:1px solid var(--gray-200); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .card-header h3 { font-size:14px; font-weight:600; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:var(--gray-50); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--gray-500); padding:9px 14px; text-align:left; border-bottom:1px solid var(--gray-200); white-space:nowrap; }
+  td { padding:9px 14px; font-size:13px; border-bottom:1px solid var(--gray-100); }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:var(--gray-50); }
+
+  /* Badges */
+  .badge { display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+  .badge-success { background:var(--success-light); color:var(--success); }
+  .badge-danger  { background:var(--danger-light);  color:var(--danger); }
+  .badge-warning { background:var(--warning-light); color:var(--warning); }
+  .badge-primary { background:var(--primary-light); color:var(--primary); }
+  .badge-gray    { background:var(--gray-100); color:var(--gray-500); }
+  .badge-purple  { background:#f3e8ff; color:#7c3aed; }
+
+  /* Modal */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:1000; backdrop-filter:blur(2px); }
+  .modal { background:#fff; border-radius:12px; width:500px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+  .modal-header { padding:18px 22px; border-bottom:1px solid var(--gray-200); display:flex; align-items:center; justify-content:space-between; }
+  .modal-header h3 { font-size:15px; font-weight:600; }
+  .modal-close { cursor:pointer; font-size:20px; color:var(--gray-500); background:none; border:none; }
+  .modal-body { padding:20px 22px; }
+  .modal-footer { padding:14px 22px; border-top:1px solid var(--gray-200); display:flex; gap:8px; justify-content:flex-end; }
+
+  /* Form */
+  .form-group { margin-bottom:14px; }
+  .form-label { display:block; font-size:12px; font-weight:600; color:var(--gray-700); margin-bottom:5px; }
+  .form-control { width:100%; padding:8px 11px; border:1px solid var(--gray-300); border-radius:6px; font-size:13px; outline:none; transition:border-color .15s; background:#fff; color:var(--gray-900); }
+  .form-control:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .form-check { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+  .form-check input { width:16px; height:16px; cursor:pointer; }
+
+  /* Login */
+  #login-screen { position:fixed; inset:0; background:linear-gradient(135deg,#1e293b 0%,#1e40af 100%); display:flex; align-items:center; justify-content:center; z-index:9999; }
+  .login-card { background:#fff; border-radius:16px; padding:36px; width:370px; box-shadow:0 25px 50px rgba(0,0,0,.3); }
+  .login-card h1 { font-size:21px; font-weight:700; text-align:center; margin-bottom:4px; }
+  .login-card p  { text-align:center; color:var(--gray-500); font-size:13px; margin-bottom:24px; }
+  .login-logo { text-align:center; font-size:38px; margin-bottom:12px; }
+
+  /* Filters */
+  .filters { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:flex-end; }
+  .filters .form-group { margin-bottom:0; }
+
+  /* Tabs */
+  .tabs { display:flex; gap:2px; margin-bottom:16px; background:var(--gray-100); border-radius:8px; padding:3px; width:fit-content; }
+  .tab { padding:6px 14px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; color:var(--gray-500); transition:all .15s; border:none; background:none; }
+  .tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+  .page { display:none; }
+  .page.active { display:block; }
+
+  /* Location overview cards */
+  .loc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; margin-bottom:20px; }
+  .loc-card { background:#fff; border:1px solid var(--gray-200); border-radius:10px; padding:14px 16px; }
+  .loc-card h4 { font-size:13px; font-weight:600; margin-bottom:2px; }
+  .loc-card .city { font-size:11px; color:var(--gray-500); margin-bottom:10px; }
+  .loc-stats { display:flex; gap:8px; }
+  .loc-stat { flex:1; text-align:center; background:var(--gray-50); border-radius:6px; padding:6px 4px; }
+  .loc-stat .n { font-size:18px; font-weight:700; }
+  .loc-stat .l { font-size:10px; color:var(--gray-500); }
+  .loc-stat.present .n { color:var(--success); }
+  .loc-stat.left    .n { color:var(--warning); }
+  .loc-stat.absent  .n { color:var(--danger); }
+
+  .empty-state { text-align:center; padding:40px 20px; color:var(--gray-500); }
+  .empty-state .icon { font-size:36px; margin-bottom:10px; }
+  .alert { padding:10px 13px; border-radius:6px; font-size:13px; margin-bottom:12px; }
+  .alert-error { background:var(--danger-light); color:var(--danger); }
+  .alert-success { background:var(--success-light); color:var(--success); }
+
+  .qr-code-text { font-family:monospace; font-size:16px; font-weight:700; background:var(--gray-100); padding:8px 18px; border-radius:8px; letter-spacing:2px; display:inline-block; margin:10px 0; }
+
+  @media(max-width:900px){ .stats-grid{grid-template-columns:repeat(3,1fr)} #sidebar{display:none} }
+  @media(max-width:600px){ .stats-grid{grid-template-columns:1fr 1fr} .form-row{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🏢</div>
+    <h1>Jelenlét Nyilvántartó</h1>
+    <p>Admin belépés</p>
+    <div id="login-error" class="alert alert-error" style="display:none"></div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" id="login-email" class="form-control" value="admin@company.hu"></div>
+    <div class="form-group"><label class="form-label">Jelszó</label><input type="password" id="login-password" class="form-control" value="Admin1234!"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="login()">Belépés</button>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div class="sidebar-logo"><h1>🏢 Jelenlét Rendszer</h1><p>Nyilvántartó v2.0</p></div>
+  <nav class="nav-section">
+    <div class="nav-label">Áttekintés</div>
+    <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="icon">📊</span> Vezérlőpult</div>
+    <div class="nav-item" onclick="showPage('overview',this)"><span class="icon">🗺</span> Telephelyek áttekintő</div>
+    <div class="nav-label">Nyilvántartás</div>
+    <div class="nav-item" onclick="showPage('attendance',this)"><span class="icon">🕐</span> Eseménynapló</div>
+    <div class="nav-item" onclick="showPage('reports',this)"><span class="icon">📈</span> Kimutatások</div>
+    <div class="nav-label">Törzsadatok</div>
+    <div class="nav-item" onclick="showPage('employees',this)"><span class="icon">👥</span> Dolgozók</div>
+    <div class="nav-item" onclick="showPage('locations',this)"><span class="icon">📍</span> Telephelyek</div>
+    <div class="nav-item" onclick="showPage('nfc',this)"><span class="icon">📡</span> NFC Tagek</div>
+    <div class="nav-label">Megbízói ellenőrzés</div>
+    <div class="nav-item" onclick="showPage('integrity',this)"><span class="icon">🔐</span> Integritás ellenőrzés</div>
+    <div class="nav-item" onclick="showPage('auditlog',this)"><span class="icon">📋</span> Audit napló</div>
+    <div class="nav-label">Rendszer</div>
+    <div class="nav-item" onclick="showPage('settings',this)"><span class="icon">⚙️</span> Beállítások</div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info"><strong id="sidebar-username">Admin</strong><span id="sidebar-email"></span></div>
+    <button class="btn-logout" onclick="logout()">⟵ Kijelentkezés</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <div class="topbar">
+    <h2 id="page-title">Vezérlőpult</h2>
+    <div class="topbar-actions" id="topbar-actions">
+      <span id="topbar-date" style="font-size:12px;color:var(--gray-500)"></span>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="label">Jelen</div><div class="value" id="s-present" style="color:var(--success)">–</div><div class="sub">ma összesen</div></div>
+        <div class="stat-card"><div class="label">Távozott</div><div class="value" id="s-left" style="color:var(--warning)">–</div><div class="sub">ma</div></div>
+        <div class="stat-card"><div class="label">Hiányzik</div><div class="value" id="s-absent" style="color:var(--danger)">–</div><div class="sub">ma</div></div>
+        <div class="stat-card"><div class="label">Aktív dolgozó</div><div class="value" id="s-total" style="color:var(--primary)">–</div><div class="sub">összesen</div></div>
+        <div class="stat-card"><div class="label">Telephelyek</div><div class="value" id="s-locs" style="color:#7c3aed">–</div><div class="sub">aktív</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>📅 Mai jelenlét</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="dash-loc-filter" class="form-control" style="width:200px;font-size:12px" onchange="loadDashboard()"><option value="">Összes telephely</option></select>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Dolgozó</th><th>Osztály</th><th>Telephely</th><th>Státusz</th><th>Érkezés</th><th>Utolsó esemény</th></tr></thead><tbody id="today-table"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>🕐 Legutóbbi 10 esemény</h3></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Idő</th><th>Dolgozó</th><th>Telephely</th><th>Esemény</th></tr></thead><tbody id="recent-table"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="page" id="page-overview">
+      <div id="loc-overview-grid" class="loc-grid"></div>
+      <div class="card">
+        <div class="card-header"><h3>Összesített mai jelenlét – összes telephely</h3></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Dolgozó</th><th>Osztály</th><th>Telephely</th><th>Státusz</th><th>Érkezés</th><th>Helyszín</th></tr></thead><tbody id="overview-all-table"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Attendance -->
+    <div class="page" id="page-attendance">
+      <div class="filters">
+        <div class="form-group"><label class="form-label">Dátumtól</label><input type="date" id="att-from" class="form-control" style="width:145px"></div>
+        <div class="form-group"><label class="form-label">Dátumig</label><input type="date" id="att-to" class="form-control" style="width:145px"></div>
+        <div class="form-group"><label class="form-label">Telephely</label><select id="att-loc" class="form-control" style="width:180px"><option value="">Mind</option></select></div>
+        <div class="form-group"><label class="form-label">Típus</label><select id="att-type" class="form-control" style="width:120px"><option value="">Mind</option><option value="checkin">Érkezés</option><option value="checkout">Távozás</option></select></div>
+        <label class="form-check" style="font-size:12px"><input type="checkbox" id="att-voided" onchange="loadAttendance()"> Érvénytelenek is</label>
+        <button class="btn btn-primary" onclick="loadAttendance()">🔍 Szűrés</button>
+        <button class="btn btn-outline" onclick="exportCSV()">⬇ CSV (hitelesített)</button>
+        <button class="btn btn-outline" onclick="showManual()">+ Kézi bejegyzés</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Eseménynapló</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="att-count" style="font-size:12px;color:var(--gray-500)"></span>
+            <span style="font-size:11px;color:var(--gray-400)">🔒 Rekordok nem törölhetők – csak érvényteleníthetők</span>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Dátum</th><th>Idő</th><th>Dolgozó</th><th>Telephely</th><th>Esemény</th><th>Hash</th><th>Érvényesség</th><th>Művelet</th></tr></thead><tbody id="att-table"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Reports -->
+    <div class="page" id="page-reports">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('weekly',this)">Heti</button>
+        <button class="tab" onclick="switchTab('monthly',this)">Havi</button>
+        <button class="tab" onclick="switchTab('custom',this)">Egyéni</button>
+      </div>
+      <div class="filters">
+        <div class="form-group"><label class="form-label">Dátumtól</label><input type="date" id="rep-from" class="form-control" style="width:145px"></div>
+        <div class="form-group"><label class="form-label">Dátumig</label><input type="date" id="rep-to" class="form-control" style="width:145px"></div>
+        <div class="form-group"><label class="form-label">Telephely</label><select id="rep-loc" class="form-control" style="width:200px"><option value="">Összes telephely</option></select></div>
+        <button class="btn btn-primary" onclick="loadReport()">📊 Kimutatás</button>
+        <button class="btn btn-outline" onclick="exportReportCSV()">⬇ CSV Export</button>
+      </div>
+      <div id="report-output"></div>
+    </div>
+
+    <!-- Employees -->
+    <div class="page" id="page-employees">
+      <div class="filters">
+        <input type="text" id="emp-search" class="form-control" placeholder="🔍 Keresés..." style="width:220px" oninput="filterEmployees()">
+        <select id="emp-loc-filter" class="form-control" style="width:180px" onchange="filterEmployees()"><option value="">Összes telephely</option></select>
+        <button class="btn btn-primary" onclick="showAddEmployee()">+ Új dolgozó</button>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Dolgozók</h3><span id="emp-count" style="font-size:12px;color:var(--gray-500)"></span></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Név</th><th>Osztály</th><th>Pozíció</th><th>Telephely</th><th>Típus</th><th>QR kód</th><th>Státusz</th><th>Műveletek</th></tr></thead><tbody id="emp-table"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Locations -->
+    <div class="page" id="page-locations">
+      <div style="margin-bottom:14px"><button class="btn btn-primary" onclick="showAddLocation()">+ Új telephely</button></div>
+      <div class="card">
+        <div class="card-header"><h3>📍 Telephelyek</h3><span id="loc-count" style="font-size:12px;color:var(--gray-500)"></span></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Kód</th><th>Telephely neve</th><th>Város</th><th>Cím</th><th>Felelős</th><th>Státusz</th><th>Terminál URL</th><th></th></tr></thead><tbody id="loc-table"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>ℹ️ Mobil terminál – telephelyi beállítás</h3></div>
+        <div style="padding:18px;font-size:13px;line-height:1.8;color:var(--gray-700)">
+          <p>Minden telephely tabletjén nyissa meg a megfelelő URL-t. A telephely kód automatikusan bekerül a jelenlét bejegyzésekbe.</p>
+          <p style="margin-top:8px"><strong>Példa URL:</strong> <code id="demo-terminal-url">https://sajat-domain.hu/mobile?telephely=BP-01</code></p>
+          <p style="margin-top:8px;color:var(--gray-500)">Az URL-t adja hozzá a tablet böngésző könyvjelzőihez, vagy telepítse PWA-ként a főképernyőre.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- NFC -->
+    <div class="page" id="page-nfc">
+      <div style="margin-bottom:14px"><button class="btn btn-primary" onclick="showAddNfc()">+ Új NFC Tag</button></div>
+      <div class="card">
+        <div class="card-header"><h3>NFC Tag konfiguráció</h3></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Tag ID</th><th>Megnevezés</th><th>Telephely</th><th>Típus</th><th></th></tr></thead><tbody id="nfc-table"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Integrity -->
+    <div class="page" id="page-integrity">
+      <div class="card" style="max-width:680px">
+        <div class="card-header"><h3>🔐 Hash-lánc integritás ellenőrzés</h3></div>
+        <div style="padding:20px">
+          <p style="font-size:13px;color:var(--gray-700);line-height:1.7;margin-bottom:16px">
+            Minden jelenlét bejegyzés egy <strong>SHA-256 kriptográfiai hash-t</strong> tartalmaz, amely a bejegyzés összes adatából és az előző bejegyzés hash-éből számított. Ha bárki utólag módosítja az adatbázist, a lánc megszakad és itt látható lesz.
+          </p>
+          <button class="btn btn-primary" onclick="runVerify()" id="verify-btn">🔍 Ellenőrzés futtatása</button>
+          <div id="verify-result" style="margin-top:20px"></div>
+        </div>
+      </div>
+      <div class="card" style="max-width:680px;margin-top:16px">
+        <div class="card-header"><h3>ℹ️ Hogyan működik?</h3></div>
+        <div style="padding:18px;font-size:13px;color:var(--gray-700);line-height:1.9">
+          <p><strong>1. Rögzítéskor</strong> – minden beolvasásnál a rendszer kiszámítja: <code>hash = SHA256(dolgozó + esemény + időpont + helyszín + előző_hash)</code></p>
+          <p><strong>2. Az előző hash beépítése</strong> – mint a blockchain-nél, minden rekord „láncolódik" az előzőhöz.</p>
+          <p><strong>3. Ellenőrzéskor</strong> – a rendszer minden rekordhoz újraszámítja a hash-t és összehasonlítja a tárolttal. Eltérés = manipuláció.</p>
+          <p><strong>4. Törlés tiltott</strong> – rekordok nem törölhetők, csak érvényteleníthetők kötelező indoklással. Az érvénytelenítés az audit naplóba kerül.</p>
+          <p style="margin-top:8px;color:var(--gray-500)">A megbízó ezt az ellenőrzést bármikor, saját maga is lefuttathatja.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="page" id="page-auditlog">
+      <div class="card">
+        <div class="card-header"><h3>📋 Admin audit napló – minden változtatás rögzítve</h3></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Dátum/Idő</th><th>Művelet</th><th>Érintett dolgozó</th><th>Eredeti időpont</th><th>Indoklás</th><th>Admin</th></tr></thead><tbody id="audit-table"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="page" id="page-settings">
+      <div class="card" style="max-width:460px">
+        <div class="card-header"><h3>🔑 Jelszó módosítás</h3></div>
+        <div style="padding:18px">
+          <div class="form-group"><label class="form-label">Jelenlegi jelszó</label><input type="password" id="cur-pw" class="form-control"></div>
+          <div class="form-group"><label class="form-label">Új jelszó</label><input type="password" id="new-pw" class="form-control"></div>
+          <button class="btn btn-primary" onclick="changePassword()">Mentés</button>
+          <div id="pw-msg" style="margin-top:8px;font-size:13px"></div>
+        </div>
+      </div>
+      <div class="card" style="max-width:460px;margin-top:14px">
+        <div class="card-header"><h3>📱 Mobil terminál elérés</h3></div>
+        <div style="padding:18px;font-size:13px;line-height:1.8">
+          <p>Terminál URL: <a href="/mobile" target="_blank" style="color:var(--primary);font-weight:600">/mobile</a></p>
+          <p>NFC olvasás: <strong>Android Chrome 86+</strong> (HTTPS szükséges)</p>
+          <p>QR szkennelés: <strong>minden modern mobilböngésző</strong></p>
+          <p style="margin-top:8px;color:var(--gray-500)">Telephelyi URL: <code>/mobile?telephely=KÓDJA</code></p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: Dolgozó -->
+<div id="emp-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3 id="emp-modal-title">Új dolgozó</h3><button class="modal-close" onclick="closeModal('emp-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="emp-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Teljes név *</label><input type="text" id="emp-name" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Osztály</label><input type="text" id="emp-dept" class="form-control"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Pozíció</label><input type="text" id="emp-pos" class="form-control"></div>
+        <div class="form-group"><label class="form-label">PIN kód * (min. 4 szám)</label><input type="number" id="emp-pin" class="form-control" placeholder="pl. 1234"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Telephely</label><select id="emp-loc" class="form-control"><option value="">— Mozgó dolgozó (nincs fix telephely) —</option></select></div>
+      <label class="form-check" style="margin-bottom:14px"><input type="checkbox" id="emp-mobile"><span>Mozgó dolgozó (több telephelyen is bejelentkezhet)</span></label>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Email</label><input type="email" id="emp-email" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Telefon</label><input type="tel" id="emp-phone" class="form-control"></div>
+      </div>
+      <div id="emp-modal-error" class="alert alert-error" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('emp-modal')">Mégse</button>
+      <button class="btn btn-primary" onclick="saveEmployee()">Mentés</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Telephely -->
+<div id="loc-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3 id="loc-modal-title">Új telephely</h3><button class="modal-close" onclick="closeModal('loc-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="loc-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Azonosító kód *</label><input type="text" id="loc-code" class="form-control" placeholder="pl. BP-01" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="form-group"><label class="form-label">Telephely neve *</label><input type="text" id="loc-name" class="form-control" placeholder="Budapest – Központ"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Város</label><input type="text" id="loc-city" class="form-control" placeholder="Budapest"></div>
+        <div class="form-group"><label class="form-label">Cím</label><input type="text" id="loc-address" class="form-control" placeholder="Kossuth tér 1."></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Telephely felelős</label><input type="text" id="loc-manager" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Telefon</label><input type="tel" id="loc-phone" class="form-control"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" id="loc-email" class="form-control"></div>
+      <div id="loc-modal-error" class="alert alert-error" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('loc-modal')">Mégse</button>
+      <button class="btn btn-primary" onclick="saveLocation()">Mentés</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: NFC -->
+<div id="nfc-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Új NFC Tag</h3><button class="modal-close" onclick="closeModal('nfc-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Tag ID *</label><input type="text" id="nfc-tagid" class="form-control" placeholder="NFC-ENTRY-003"></div>
+      <div class="form-group"><label class="form-label">Megnevezés *</label><input type="text" id="nfc-location" class="form-control" placeholder="Főbejárat"></div>
+      <div class="form-group"><label class="form-label">Telephely</label><select id="nfc-loc-sel" class="form-control"><option value="">—</option></select></div>
+      <div class="form-group"><label class="form-label">Típus *</label><select id="nfc-type" class="form-control"><option value="entry">Bejárat (érkezés)</option><option value="exit">Kijárat (távozás)</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('nfc-modal')">Mégse</button>
+      <button class="btn btn-primary" onclick="saveNfc()">Mentés</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: QR -->
+<div id="qr-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>QR Kód</h3><button class="modal-close" onclick="closeModal('qr-modal')">✕</button></div>
+    <div class="modal-body" style="text-align:center">
+      <div id="qr-svg"></div>
+      <div class="qr-code-text" id="qr-text"></div>
+      <p style="font-size:13px;color:var(--gray-700);font-weight:600" id="qr-name"></p>
+      <p style="font-size:12px;color:var(--gray-400);margin-top:4px">Ezt a kódot kell beolvasni a mobil terminálon</p>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('qr-modal')">Bezárás</button><button class="btn btn-primary" onclick="window.print()">🖨 Nyomtatás</button></div>
+  </div>
+</div>
+
+<!-- Modal: Kézi bejegyzés -->
+<div id="manual-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Kézi bejegyzés</h3><button class="modal-close" onclick="closeModal('manual-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Dolgozó</label><select id="man-emp" class="form-control"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Dátum</label><input type="date" id="man-date" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Idő</label><input type="time" id="man-time" class="form-control"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Esemény</label><select id="man-type" class="form-control"><option value="checkin">Érkezés</option><option value="checkout">Távozás</option></select></div>
+        <div class="form-group"><label class="form-label">Telephely</label><select id="man-loc" class="form-control"><option value="">—</option></select></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Indoklás * <span style="font-weight:400;color:var(--gray-500)">(min. 5 karakter – audit naplóba kerül)</span></label>
+        <input type="text" id="man-reason" class="form-control" placeholder="pl. Rendszerleállás miatt utólag rögzítve">
+      </div>
+      <div id="man-modal-error" class="alert alert-error" style="display:none"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('manual-modal')">Mégse</button><button class="btn btn-primary" onclick="saveManual()">Mentés</button></div>
+  </div>
+</div>
+
+<!-- Modal: Érvénytelenítés -->
+<div id="void-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>🚫 Bejegyzés érvénytelenítése</h3><button class="modal-close" onclick="closeModal('void-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="alert alert-error" style="margin-bottom:14px">⚠️ A rekord nem törlődik – csak érvénytelenként jelölődik meg. Az érvénytelenítés az audit naplóba kerül.</div>
+      <div id="void-record-info" style="background:var(--gray-50);border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:14px;line-height:1.8"></div>
+      <div class="form-group">
+        <label class="form-label">Érvénytelenítés oka * <span style="font-weight:400;color:var(--gray-500)">(min. 5 karakter)</span></label>
+        <input type="text" id="void-reason" class="form-control" placeholder="pl. Téves azonosítás, rendszerhiba…">
+      </div>
+      <div id="void-modal-error" class="alert alert-error" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('void-modal')">Mégse</button>
+      <button class="btn btn-danger" onclick="confirmVoid()">🚫 Érvénytelenítés</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let token = localStorage.getItem('att_token');
+let currentUser = null;
+let employees = [], locations = [];
+
+// === AUTH ===
+async function login() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const res = await fetch(`${API}/api/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+  const data = await res.json();
+  if (!res.ok) { document.getElementById('login-error').textContent=data.error; document.getElementById('login-error').style.display='block'; return; }
+  token = data.token; currentUser = data.user;
+  localStorage.setItem('att_token', token);
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('sidebar-username').textContent = currentUser.name;
+  document.getElementById('sidebar-email').textContent = currentUser.email;
+  initApp();
+}
+function logout() { localStorage.removeItem('att_token'); location.reload(); }
+
+async function api(path, options={}) {
+  const res = await fetch(`${API}${path}`, { ...options, headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,...(options.headers||{})} });
+  if (res.status===401) { logout(); return; }
+  return res.json();
+}
+
+// === INIT ===
+async function initApp() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('hu-HU',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('demo-terminal-url').textContent = `${location.origin}/mobile?telephely=KÓDJA`;
+  setDefaultDates();
+  [employees, locations] = await Promise.all([api('/api/employees'), api('/api/locations')]);
+  if (!employees || !locations) return;
+  populateLocationSelects();
+  await loadDashboard();
+}
+
+function setDefaultDates() {
+  const today = new Date().toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now()-7*864e5).toISOString().split('T')[0];
+  ['att-from','rep-from'].forEach(id => document.getElementById(id).value = weekAgo);
+  ['att-to','rep-to'].forEach(id => document.getElementById(id).value = today);
+  document.getElementById('man-date').value = today;
+  document.getElementById('man-time').value = new Date().toTimeString().substring(0,5);
+}
+
+function populateLocationSelects() {
+  const opts = locations.map(l => `<option value="${l._id}">${l.name}</option>`).join('');
+  const optsFull = `<option value="">Összes telephely</option>` + opts;
+  ['dash-loc-filter','att-loc','rep-loc','emp-loc-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = (id === 'emp-loc-filter' ? '<option value="">Összes telephely</option>' : '<option value="">Összes telephely</option>') + opts;
+  });
+  // Employee & manual loc (no "all" option for assignment)
+  const optsAssign = `<option value="">— Mozgó dolgozó —</option>` + opts;
+  ['emp-loc','man-loc'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = optsAssign; });
+  ['nfc-loc-sel'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = `<option value="">—</option>` + opts; });
+  // Manual employee select
+  document.getElementById('man-emp').innerHTML = employees.filter(e=>e.active).map(e=>`<option value="${e._id}">${e.name} ${e.locationName?'('+e.locationName+')':''}</option>`).join('');
+}
+
+// === NAVIGATION ===
+const titles = {dashboard:'Vezérlőpult',overview:'Telephelyek áttekintő',attendance:'Eseménynapló',reports:'Kimutatások',employees:'Dolgozók',locations:'Telephelyek',nfc:'NFC Tagek',integrity:'Integritás ellenőrzés',auditlog:'Audit napló',settings:'Beállítások'};
+
+async function showPage(page, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if (el) el.classList.add('active');
+  document.getElementById('page-title').textContent = titles[page]||page;
+  if (page==='dashboard')  await loadDashboard();
+  if (page==='overview')   await loadOverview();
+  if (page==='attendance') await loadAttendance();
+  if (page==='employees')  await loadEmployees();
+  if (page==='locations')  await loadLocations();
+  if (page==='nfc')        await loadNfc();
+  if (page==='auditlog')   await loadAuditLog();
+}
+
+// === DASHBOARD ===
+async function loadDashboard() {
+  const locId = document.getElementById('dash-loc-filter')?.value || '';
+  const url = '/api/attendance/today' + (locId ? `?locationId=${locId}` : '');
+  const [todayData, recent, empList, locList] = await Promise.all([
+    api(url),
+    api('/api/attendance?dateFrom='+new Date().toISOString().split('T')[0]),
+    api('/api/employees'),
+    api('/api/locations'),
+  ]);
+  if (!todayData) return;
+  employees = empList || employees;
+  locations = locList || locations;
+
+  const present = todayData.filter(r=>r.status==='present').length;
+  const left    = todayData.filter(r=>r.status==='left').length;
+  const absent  = todayData.filter(r=>r.status==='absent').length;
+  document.getElementById('s-present').textContent = present;
+  document.getElementById('s-left').textContent    = left;
+  document.getElementById('s-absent').textContent  = absent;
+  document.getElementById('s-total').textContent   = employees.filter(e=>e.active).length;
+  document.getElementById('s-locs').textContent    = locations.filter(l=>l.active).length;
+
+  document.getElementById('today-table').innerHTML = todayData.map(r=>`
+    <tr>
+      <td><strong>${r.employee.name}</strong>${r.employee.mobile?'<span class="badge badge-purple" style="margin-left:5px">Mozgó</span>':''}</td>
+      <td>${r.employee.department||'–'}</td>
+      <td style="font-size:12px">${r.employee.locationName||r.checkinLocation||'–'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${r.checkinTime||'–'}</td>
+      <td>${r.lastEventTime||'–'}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty-state">Nincs adat</td></tr>';
+
+  document.getElementById('recent-table').innerHTML = (recent||[]).slice(0,10).map(r=>`
+    <tr>
+      <td>${r.date} ${r.time}</td>
+      <td><strong>${r.employeeName}</strong></td>
+      <td style="font-size:12px">${r.locationName||'–'}</td>
+      <td>${eventBadge(r.type)}</td>
+    </tr>`).join('');
+}
+
+// === OVERVIEW ===
+async function loadOverview() {
+  const [overview, todayAll] = await Promise.all([api('/api/attendance/overview'), api('/api/attendance/today')]);
+  if (!overview || !todayAll) return;
+  document.getElementById('loc-overview-grid').innerHTML = overview.map(o=>`
+    <div class="loc-card">
+      <h4>${o.location.name}</h4>
+      <div class="city">📍 ${o.location.city||''} &nbsp;·&nbsp; <code style="font-size:11px">${o.location.code||''}</code></div>
+      <div class="loc-stats">
+        <div class="loc-stat present"><div class="n">${o.present}</div><div class="l">Jelen</div></div>
+        <div class="loc-stat left"><div class="n">${o.left}</div><div class="l">Távozott</div></div>
+        <div class="loc-stat absent"><div class="n">${o.absent}</div><div class="l">Hiányzik</div></div>
+      </div>
+    </div>`).join('');
+  document.getElementById('overview-all-table').innerHTML = todayAll.map(r=>`
+    <tr>
+      <td><strong>${r.employee.name}</strong></td>
+      <td>${r.employee.department||'–'}</td>
+      <td style="font-size:12px">${r.employee.locationName||'–'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${r.checkinTime||'–'}</td>
+      <td style="font-size:12px">${r.checkinLocation||'–'}</td>
+    </tr>`).join('');
+}
+
+// === ATTENDANCE ===
+let pendingVoidId = null;
+
+async function loadAttendance() {
+  const from   = document.getElementById('att-from').value;
+  const to     = document.getElementById('att-to').value;
+  const type   = document.getElementById('att-type').value;
+  const loc    = document.getElementById('att-loc').value;
+  const voided = document.getElementById('att-voided').checked;
+  let url = `/api/attendance?dateFrom=${from}&dateTo=${to}`;
+  if (type)   url += `&type=${type}`;
+  if (loc)    url += `&locationId=${loc}`;
+  if (voided) url += `&includeVoided=true`;
+  const data = await api(url);
+  if (!data) return;
+  document.getElementById('att-count').textContent = `${data.length} bejegyzés`;
+  document.getElementById('att-table').innerHTML = data.length ? data.map((r,i)=>{
+    const isVoided = !!r.voided;
+    const rowStyle = isVoided ? 'opacity:.55;background:#fff5f5' : '';
+    const hashSnip = r.hash ? `<code style="font-size:10px;color:var(--gray-500)">${r.hash.substring(0,10)}…</code>` : '–';
+    const validBadge = isVoided
+      ? `<span class="badge badge-danger" title="${r.voidReason||''}">🚫 Érvénytelen</span>`
+      : `<span class="badge badge-success">✓ Érvényes</span>`;
+    const actionBtn = isVoided
+      ? `<span style="font-size:11px;color:var(--gray-400)">érvénytelen</span>`
+      : `<button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="showVoid('${r._id}','${(r.employeeName||'').replace(/'/g,"\\'")}','${r.date} ${r.time}','${r.locationName||''}')">🚫 Érvénytelen</button>`;
+    return `<tr style="${rowStyle}">
+      <td style="font-size:11px;color:var(--gray-400)">${r.chainIndex ?? i}</td>
+      <td>${r.date}</td><td>${r.time}</td>
+      <td><strong>${r.employeeName}</strong></td>
+      <td style="font-size:12px">${r.locationName||'–'}</td>
+      <td>${eventBadge(r.type)}${r.manual?'<span class="badge badge-warning" style="margin-left:4px">Kézi</span>':''}</td>
+      <td>${hashSnip}</td>
+      <td>${validBadge}</td>
+      <td>${actionBtn}</td>
+    </tr>`;
+  }).join('')
+  : '<tr><td colspan="9"><div class="empty-state"><div class="icon">📋</div>Nincs találat</div></td></tr>';
+}
+
+function showVoid(id, name, timestamp, location) {
+  pendingVoidId = id;
+  document.getElementById('void-record-info').innerHTML =
+    `<strong>Dolgozó:</strong> ${name}<br><strong>Időpont:</strong> ${timestamp}<br><strong>Helyszín:</strong> ${location||'–'}`;
+  document.getElementById('void-reason').value = '';
+  document.getElementById('void-modal-error').style.display = 'none';
+  document.getElementById('void-modal').style.display = 'flex';
+}
+
+async function confirmVoid() {
+  const reason = document.getElementById('void-reason').value.trim();
+  if (reason.length < 5) {
+    const err = document.getElementById('void-modal-error');
+    err.textContent = 'Az indoklás legalább 5 karakter legyen!';
+    err.style.display = 'block';
+    return;
+  }
+  const res = await fetch(`${API}/api/attendance/${pendingVoidId}/void`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+    body: JSON.stringify({ reason })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const err = document.getElementById('void-modal-error');
+    err.textContent = data.error || 'Hiba történt';
+    err.style.display = 'block';
+    return;
+  }
+  closeModal('void-modal');
+  await loadAttendance();
+}
+
+function exportCSV() {
+  const f=document.getElementById('att-from').value,t=document.getElementById('att-to').value,l=document.getElementById('att-loc').value;
+  const v=document.getElementById('att-voided').checked;
+  window.open(`/api/attendance/export/csv?dateFrom=${f}&dateTo=${t}${l?'&locationId='+l:''}${v?'&includeVoided=true':''}`,'_blank');
+}
+
+// === INTEGRITY ===
+async function runVerify() {
+  const btn = document.getElementById('verify-btn');
+  const out = document.getElementById('verify-result');
+  btn.disabled = true; btn.textContent = '⏳ Ellenőrzés folyamatban…';
+  out.innerHTML = '';
+  const data = await api('/api/attendance/verify');
+  btn.disabled = false; btn.innerHTML = '🔍 Ellenőrzés futtatása';
+  if (!data) { out.innerHTML = '<div class="alert alert-error">Nem sikerült kapcsolódni a szerverhez.</div>'; return; }
+  if (data.valid) {
+    out.innerHTML = `
+      <div class="alert alert-success" style="font-size:14px;padding:16px">
+        <strong>✅ A lánc integritása RENDBEN</strong><br>
+        <span style="font-size:13px">Ellenőrzött rekordok: <strong>${data.total}</strong> &nbsp;·&nbsp; Utolsó hash: <code style="font-size:11px">${(data.lastHash||'').substring(0,20)}…</code><br>
+        Ellenőrzés időpontja: ${new Date(data.checkedAt).toLocaleString('hu-HU')}</span>
+      </div>`;
+  } else {
+    const rows = data.broken.map(b=>`
+      <tr>
+        <td>${b.chainIndex}</td>
+        <td>${b.employeeName||'–'}</td>
+        <td>${b.timestamp||'–'}</td>
+        <td style="font-size:10px;color:var(--danger)"><code>${(b.storedHash||'').substring(0,16)}…</code></td>
+        <td style="font-size:10px;color:var(--success)"><code>${(b.expectedHash||'').substring(0,16)}…</code></td>
+      </tr>`).join('');
+    out.innerHTML = `
+      <div class="alert alert-error" style="font-size:14px;padding:16px;margin-bottom:12px">
+        <strong>🚨 FIGYELEM – Integritás megszakadt!</strong><br>
+        <span style="font-size:13px">${data.broken.length} sérült rekord találva ${data.total}-ből. Az adatbázis utólag módosítva lett!</span>
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>#</th><th>Dolgozó</th><th>Időpont</th><th>Tárolt hash</th><th>Elvárt hash</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }
+}
+
+// === AUDIT LOG ===
+async function loadAuditLog() {
+  const data = await api('/api/attendance/audit-log');
+  if (!data) return;
+  document.getElementById('audit-table').innerHTML = data.length ? data.map(r=>`
+    <tr>
+      <td style="white-space:nowrap;font-size:12px">${r.createdAt ? new Date(r.createdAt).toLocaleString('hu-HU') : '–'}</td>
+      <td>${r.action==='void'?'<span class="badge badge-danger">Érvénytelenítés</span>':'<span class="badge badge-warning">Kézi bejegyzés</span>'}</td>
+      <td><strong>${r.employeeName||'–'}</strong></td>
+      <td style="font-size:12px">${r.originalTimestamp||'–'}</td>
+      <td style="font-size:12px">${r.reason||'–'}</td>
+      <td style="font-size:12px">${r.adminEmail||r.adminName||'–'}</td>
+    </tr>`).join('')
+  : '<tr><td colspan="6"><div class="empty-state"><div class="icon">📋</div>Nincs audit bejegyzés</div></td></tr>';
+}
+
+// === REPORTS ===
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const today = new Date(), to = today.toISOString().split('T')[0];
+  let from;
+  if (tab==='weekly')  { const m=new Date(today); m.setDate(today.getDate()-today.getDay()+1); from=m.toISOString().split('T')[0]; }
+  if (tab==='monthly') { from=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`; }
+  if (from) { document.getElementById('rep-from').value=from; document.getElementById('rep-to').value=to; }
+}
+async function loadReport() {
+  const from=document.getElementById('rep-from').value, to=document.getElementById('rep-to').value, loc=document.getElementById('rep-loc').value;
+  let url = `/api/attendance/report?dateFrom=${from}&dateTo=${to}`;
+  if (loc) url += `&locationId=${loc}`;
+  const data = await api(url);
+  if (!data) return;
+  const locName = loc ? (locations.find(l=>l._id===loc)?.name||'') : 'Összes telephely';
+  document.getElementById('report-output').innerHTML = `
+    <div class="card">
+      <div class="card-header"><h3>Összesítő: ${from} – ${to} &nbsp;·&nbsp; ${locName}</h3><span style="font-size:12px;color:var(--gray-500)">${data.workDays} munkanap</span></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Dolgozó</th><th>Osztály</th><th>Telephely</th><th>Jelen napok</th><th>Hiányzás</th><th>Összes óra</th><th>Átlag/nap</th></tr></thead>
+      <tbody>${data.report.map(r=>`
+        <tr>
+          <td><strong>${r.employee.name}</strong>${r.employee.mobile?'<span class="badge badge-purple" style="margin-left:4px">Mozgó</span>':''}</td>
+          <td>${r.employee.department||'–'}</td>
+          <td style="font-size:12px">${r.employee.locationName||'–'}</td>
+          <td><span class="badge badge-success">${r.daysPresent} nap</span></td>
+          <td>${r.daysAbsent>0?`<span class="badge badge-danger">${r.daysAbsent} nap</span>`:'<span class="badge badge-gray">0</span>'}</td>
+          <td><strong>${r.totalHours} h</strong></td>
+          <td>${r.daysPresent>0?Math.round(r.totalMinutes/r.daysPresent/60*10)/10+' h':'–'}</td>
+        </tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+}
+function exportReportCSV() { const f=document.getElementById('rep-from').value,t=document.getElementById('rep-to').value,l=document.getElementById('rep-loc').value; window.open(`/api/attendance/export/csv?dateFrom=${f}&dateTo=${t}${l?'&locationId='+l:''}`,'_blank'); }
+
+// === EMPLOYEES ===
+async function loadEmployees() {
+  employees = await api('/api/employees') || [];
+  renderEmployees(employees);
+}
+function filterEmployees() {
+  const q   = document.getElementById('emp-search').value.toLowerCase();
+  const loc = document.getElementById('emp-loc-filter').value;
+  const filtered = employees.filter(e =>
+    (e.name.toLowerCase().includes(q) || (e.department||'').toLowerCase().includes(q)) &&
+    (!loc || e.locationId === loc)
+  );
+  renderEmployees(filtered);
+}
+function renderEmployees(data) {
+  document.getElementById('emp-count').textContent = `${data.length} fő`;
+  document.getElementById('emp-table').innerHTML = data.map(e=>`
+    <tr>
+      <td><strong>${e.name}</strong></td><td>${e.department||'–'}</td><td>${e.position||'–'}</td>
+      <td style="font-size:12px">${e.locationName||'<span style="color:var(--gray-400)">–</span>'}</td>
+      <td>${e.mobile?'<span class="badge badge-purple">Mozgó</span>':'<span class="badge badge-gray">Fix</span>'}</td>
+      <td><code style="font-size:11px">${e.qrCode}</code></td>
+      <td>${e.active?'<span class="badge badge-success">Aktív</span>':'<span class="badge badge-gray">Inaktív</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="showEditEmployee('${e._id}')">✏</button>
+        <button class="btn btn-outline btn-sm" onclick="showQR('${e.qrCode}','${e.name}')">📱 QR</button>
+        <button style="color:var(--danger);background:none;border:none;cursor:pointer;font-size:13px;padding:5px" onclick="deactivate('${e._id}','${e.name}')">🗑</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="8"><div class="empty-state"><div class="icon">👥</div>Nincs találat</div></td></tr>';
+}
+function showAddEmployee() {
+  document.getElementById('emp-id').value='';
+  document.getElementById('emp-modal-title').textContent='Új dolgozó hozzáadása';
+  ['emp-name','emp-dept','emp-pos','emp-pin','emp-email','emp-phone'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('emp-loc').value='';
+  document.getElementById('emp-mobile').checked=false;
+  document.getElementById('emp-modal-error').style.display='none';
+  document.getElementById('emp-modal').style.display='flex';
+}
+async function showEditEmployee(id) {
+  const e = employees.find(e=>e._id===id); if(!e) return;
+  document.getElementById('emp-id').value=id;
+  document.getElementById('emp-modal-title').textContent='Dolgozó szerkesztése';
+  document.getElementById('emp-name').value=e.name;
+  document.getElementById('emp-dept').value=e.department||'';
+  document.getElementById('emp-pos').value=e.position||'';
+  document.getElementById('emp-pin').value='';
+  document.getElementById('emp-email').value=e.email||'';
+  document.getElementById('emp-phone').value=e.phone||'';
+  document.getElementById('emp-loc').value=e.locationId||'';
+  document.getElementById('emp-mobile').checked=!!e.mobile;
+  document.getElementById('emp-modal-error').style.display='none';
+  document.getElementById('emp-modal').style.display='flex';
+}
+async function saveEmployee() {
+  const id = document.getElementById('emp-id').value;
+  const locId = document.getElementById('emp-loc').value;
+  const locName = locId ? (locations.find(l=>l._id===locId)?.name||null) : null;
+  const body = {
+    name:document.getElementById('emp-name').value,
+    department:document.getElementById('emp-dept').value,
+    position:document.getElementById('emp-pos').value,
+    pin:document.getElementById('emp-pin').value||undefined,
+    email:document.getElementById('emp-email').value,
+    phone:document.getElementById('emp-phone').value,
+    locationId: locId||null, locationName: locName,
+    mobile: document.getElementById('emp-mobile').checked,
+  };
+  if (!id && !body.pin) { showEmpError('PIN kötelező'); return; }
+  const res = await fetch(`${API}/api/employees${id?'/'+id:''}`, {method:id?'PUT':'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(body)});
+  const data = await res.json();
+  if (!res.ok) { showEmpError(data.error||'Hiba'); return; }
+  closeModal('emp-modal'); await loadEmployees();
+}
+function showEmpError(msg) { const e=document.getElementById('emp-modal-error'); e.textContent=msg; e.style.display='block'; }
+async function deactivate(id,name) { if(!confirm(`Deaktiválja: "${name}"?`)) return; await api(`/api/employees/${id}`,{method:'DELETE'}); await loadEmployees(); }
+
+// === LOCATIONS ===
+async function loadLocations() {
+  locations = await api('/api/locations') || [];
+  document.getElementById('loc-count').textContent = `${locations.length} telephely`;
+  document.getElementById('loc-table').innerHTML = locations.map(l=>`
+    <tr>
+      <td><code>${l.code||'–'}</code></td>
+      <td><strong>${l.name}</strong></td>
+      <td>${l.city||'–'}</td>
+      <td style="font-size:12px">${l.address||'–'}</td>
+      <td>${l.manager||'–'}</td>
+      <td>${l.active?'<span class="badge badge-success">Aktív</span>':'<span class="badge badge-gray">Inaktív</span>'}</td>
+      <td><code style="font-size:11px">/mobile?telephely=${encodeURIComponent(l.code||l._id)}</code></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="showEditLocation('${l._id}')">✏</button>
+        <button style="color:var(--danger);background:none;border:none;cursor:pointer;font-size:13px;padding:5px" onclick="deactivateLoc('${l._id}','${l.name}')">🗑</button>
+      </td>
+    </tr>`).join('');
+}
+function showAddLocation() {
+  document.getElementById('loc-id').value='';
+  document.getElementById('loc-modal-title').textContent='Új telephely';
+  ['loc-code','loc-name','loc-city','loc-address','loc-manager','loc-phone','loc-email'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('loc-modal-error').style.display='none';
+  document.getElementById('loc-modal').style.display='flex';
+}
+async function showEditLocation(id) {
+  const l=locations.find(l=>l._id===id); if(!l) return;
+  document.getElementById('loc-id').value=id;
+  document.getElementById('loc-modal-title').textContent='Telephely szerkesztése';
+  document.getElementById('loc-code').value=l.code||'';
+  document.getElementById('loc-name').value=l.name;
+  document.getElementById('loc-city').value=l.city||'';
+  document.getElementById('loc-address').value=l.address||'';
+  document.getElementById('loc-manager').value=l.manager||'';
+  document.getElementById('loc-phone').value=l.phone||'';
+  document.getElementById('loc-email').value=l.email||'';
+  document.getElementById('loc-modal-error').style.display='none';
+  document.getElementById('loc-modal').style.display='flex';
+}
+async function saveLocation() {
+  const id=document.getElementById('loc-id').value;
+  const body={code:document.getElementById('loc-code').value,name:document.getElementById('loc-name').value,city:document.getElementById('loc-city').value,address:document.getElementById('loc-address').value,manager:document.getElementById('loc-manager').value,phone:document.getElementById('loc-phone').value,email:document.getElementById('loc-email').value};
+  if (!body.name) { document.getElementById('loc-modal-error').textContent='Név kötelező'; document.getElementById('loc-modal-error').style.display='block'; return; }
+  const res=await fetch(`${API}/api/locations${id?'/'+id:''}`,{method:id?'PUT':'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(body)});
+  const data=await res.json();
+  if (!res.ok) { document.getElementById('loc-modal-error').textContent=data.error||'Hiba'; document.getElementById('loc-modal-error').style.display='block'; return; }
+  closeModal('loc-modal'); locations=await api('/api/locations')||[]; populateLocationSelects(); await loadLocations();
+}
+async function deactivateLoc(id,name) { if(!confirm(`Deaktiválja: "${name}"?`)) return; await api(`/api/locations/${id}`,{method:'DELETE'}); await loadLocations(); }
+
+// === NFC ===
+async function loadNfc() {
+  const tags=await api('/api/nfc-tags')||[];
+  document.getElementById('nfc-table').innerHTML=tags.map(t=>`
+    <tr>
+      <td><code>${t.tagId}</code></td>
+      <td>${t.locationName}</td>
+      <td style="font-size:12px">${t.locationCode||'–'}</td>
+      <td>${t.type==='entry'?'<span class="badge badge-success">Bejárat</span>':'<span class="badge badge-primary">Kijárat</span>'}</td>
+      <td><button style="color:var(--danger);background:none;border:none;cursor:pointer" onclick="delNfc('${t._id}')">🗑</button></td>
+    </tr>`).join('')||'<tr><td colspan="5"><div class="empty-state"><div class="icon">📡</div>Nincs konfiguráció</div></td></tr>';
+}
+function showAddNfc() { document.getElementById('nfc-modal').style.display='flex'; }
+async function saveNfc() {
+  const locId=document.getElementById('nfc-loc-sel').value;
+  const loc=locations.find(l=>l._id===locId);
+  const body={tagId:document.getElementById('nfc-tagid').value,locationName:document.getElementById('nfc-location').value,type:document.getElementById('nfc-type').value,locationId:locId||null,locationCode:loc?.code||null};
+  const res=await fetch(`${API}/api/nfc-tags`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(body)});
+  if(!res.ok){alert('Hiba – Tag ID már létezik?');return;}
+  closeModal('nfc-modal'); await loadNfc();
+}
+async function delNfc(id) { if(!confirm('Törlöd?'))return; await api(`/api/nfc-tags/${id}`,{method:'DELETE'}); await loadNfc(); }
+
+// === QR ===
+function showQR(code, name) {
+  document.getElementById('qr-text').textContent=code;
+  document.getElementById('qr-name').textContent=name;
+  let h=0; for(let c of code) h=(h*31+c.charCodeAt(0))&0xffffffff;
+  const s=10; let svg='';
+  [[0,0],[0,7],[7,0]].forEach(([cx,cy])=>{svg+=`<rect x="${cx}" y="${cy}" width="3" height="3" fill="#000"/>`;svg+=`<rect x="${cx+.5}" y="${cy+.5}" width="2" height="2" fill="#fff"/>`;svg+=`<rect x="${cx+1}" y="${cy+1}" width="1" height="1" fill="#000"/>`;});
+  for(let y=0;y<s;y++) for(let x=0;x<s;x++){if((x<4&&y<4)||(x>5&&y<4)||(x<4&&y>5))continue;if((h>>((y*s+x)%32))&1)svg+=`<rect x="${x}" y="${y}" width="1" height="1" fill="#000"/>`;}
+  document.getElementById('qr-svg').innerHTML=`<svg width="180" height="180" viewBox="0 0 ${s} ${s}" style="border:3px solid #000;display:block;margin:auto;image-rendering:pixelated">${svg}</svg>`;
+  document.getElementById('qr-modal').style.display='flex';
+}
+
+// === MANUAL ===
+async function showManual() {
+  document.getElementById('man-emp').innerHTML=employees.filter(e=>e.active).map(e=>`<option value="${e._id}">${e.name}</option>`).join('');
+  document.getElementById('man-loc').innerHTML=`<option value="">—</option>`+locations.map(l=>`<option value="${l._id}">${l.name}</option>`).join('');
+  document.getElementById('man-reason').value='';
+  document.getElementById('man-modal-error').style.display='none';
+  document.getElementById('manual-modal').style.display='flex';
+}
+async function saveManual() {
+  const locId=document.getElementById('man-loc').value;
+  const locName=locId?(locations.find(l=>l._id===locId)?.name||null):null;
+  const reason=document.getElementById('man-reason').value.trim();
+  if (reason.length < 5) {
+    const err=document.getElementById('man-modal-error');
+    err.textContent='Az indoklás legalább 5 karakter legyen!';
+    err.style.display='block'; return;
+  }
+  const body={employeeId:document.getElementById('man-emp').value,type:document.getElementById('man-type').value,date:document.getElementById('man-date').value,time:document.getElementById('man-time').value,locationId:locId||null,locationName:locName,reason};
+  const res=await fetch(`${API}/api/attendance/manual`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(body)});
+  const data=await res.json();
+  if (!res.ok) { const err=document.getElementById('man-modal-error'); err.textContent=data.error||'Hiba'; err.style.display='block'; return; }
+  closeModal('manual-modal'); await loadAttendance();
+}
+
+// === SETTINGS ===
+async function changePassword() {
+  const res=await fetch(`${API}/api/auth/change-password`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({currentPassword:document.getElementById('cur-pw').value,newPassword:document.getElementById('new-pw').value})});
+  const d=await res.json(); const m=document.getElementById('pw-msg'); m.textContent=d.message||d.error; m.style.color=res.ok?'var(--success)':'var(--danger)';
+}
+
+// === HELPERS ===
+function closeModal(id) { document.getElementById(id).style.display='none'; }
+function statusBadge(s) {
+  if(s==='present') return '<span class="badge badge-success">● Jelen</span>';
+  if(s==='left')    return '<span class="badge badge-warning">○ Távozott</span>';
+  return '<span class="badge badge-gray">– Hiányzik</span>';
+}
+function eventBadge(t) { return t==='checkin'?'<span class="badge badge-success">✅ Érkezés</span>':'<span class="badge badge-primary">🚪 Távozás</span>'; }
+
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.style.display='none';}));
+document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+
+// Init
+if (token) {
+  try { const p=JSON.parse(atob(token.split('.')[1])); currentUser=p; document.getElementById('sidebar-username').textContent=p.name||''; document.getElementById('sidebar-email').textContent=p.email||''; } catch(e){}
+  document.getElementById('login-screen').style.display='none';
+  initApp();
+}
+</script>
+</body>
+</html>
