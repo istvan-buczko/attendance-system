@@ -49,7 +49,7 @@
 
   /* ---- QR Scanner ---- */
   #screen-qr { gap: 0; }
-  .cam-wrap { position: relative; flex: 1; background: #000; overflow: hidden; }
+  .cam-wrap { position: relative; flex: 1; background: #000; overflow: hidden; min-height: 200px; }
   #video { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cam-overlay {
     position: absolute; inset: 0;
@@ -72,6 +72,16 @@
     margin-top: 20px; font-size: 14px; font-weight: 600; color: #fff;
     text-shadow: 0 1px 4px rgba(0,0,0,0.8);
   }
+  /* Photo capture button */
+  .btn-photo {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 15px; border-radius: 12px;
+    background: var(--primary); color: #fff;
+    font-size: 16px; font-weight: 700; border: none; cursor: pointer;
+    width: 100%; transition: background .15s;
+  }
+  .btn-photo:active { background: #2563eb; }
+  #photo-input { display: none; }
 
   .qr-footer { padding: 16px; background: var(--card); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
   #cam-error { color: #fca5a5; font-size: 13px; text-align: center; display: none; }
@@ -203,9 +213,18 @@
         <div class="scan-box"><div class="scan-line"></div></div>
         <div class="cam-hint" id="cam-hint">📷 Tartsa a QR kártyát a keretbe</div>
       </div>
+      <div id="scan-status" style="position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;color:rgba(255,255,255,0.5);pointer-events:none"></div>
     </div>
     <div class="qr-footer">
       <div id="cam-error"></div>
+
+      <!-- Primary: native camera photo (most reliable on Android) -->
+      <button class="btn-photo" onclick="document.getElementById('photo-input').click()">
+        📸 Kamera megnyitása – QR kód beolvasás
+      </button>
+      <input id="photo-input" type="file" accept="image/*" capture="environment"
+             onchange="handlePhotoCapture(this)">
+
       <div class="divider">vagy kézi megadás</div>
       <div class="manual-row">
         <input id="manual-qr" type="text" placeholder="pl. EMP-001" autocomplete="off" autocorrect="off" spellcheck="false"
@@ -349,22 +368,58 @@ async function initLocation() {
 
 // ── Camera / QR ────────────────────────────────────────────────────────────
 async function startCamera() {
-  const errEl = document.getElementById('cam-error');
+  const errEl  = document.getElementById('cam-error');
+  const hint   = document.getElementById('cam-hint');
   errEl.style.display = 'none';
+  hint.textContent = '⏳ Kamera indítása…';
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    errEl.textContent = '⚠️ Ez a böngésző nem támogatja a kamerát. Adja meg a kódot kézzel.';
+    errEl.style.display = 'block';
+    hint.style.display = 'none';
+    return;
+  }
+
   try {
+    // Stop any existing stream first
+    stopCamera();
+
     videoStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: { ideal: 'environment' } }
     });
     const vid = document.getElementById('video');
     vid.srcObject = videoStream;
-    await vid.play();
-    vid.addEventListener('loadedmetadata', () => {
-      scanTimer = setInterval(() => scanFrame(vid), 200);
-    });
+
+    // Play and start scan loop — don't rely on loadedmetadata alone
+    try { await vid.play(); } catch(e) { /* some browsers auto-play without await */ }
+
+    // Poll until the video has actual dimensions, then start scanning
+    const statusEl = document.getElementById('scan-status');
+    const method = barcodeDetector ? 'BarcodeDetector' : 'jsQR';
+    statusEl.textContent = `Motor: ${method}`;
+    let attempts = 0;
+    function tryStartScan() {
+      if (vid.videoWidth > 0 && vid.videoHeight > 0) {
+        hint.textContent = '📷 Tartsa a QR kártyát a keretbe';
+        scanTimer = setInterval(() => scanFrame(vid), barcodeDetector ? 300 : 150);
+      } else if (attempts++ < 50) {
+        setTimeout(tryStartScan, 100);
+      } else {
+        hint.textContent = '📷 Tartsa a QR kártyát a keretbe';
+        scanTimer = setInterval(() => scanFrame(vid), 200);
+      }
+    }
+    tryStartScan();
+
   } catch(e) {
-    errEl.textContent = '⚠️ Kamera hozzáférés megtagadva – használja a kézi bevitelt alul.';
+    console.error('Camera error:', e);
+    let msg = '⚠️ Kamera hozzáférés megtagadva – használja a kézi bevitelt alul.';
+    if (e.name === 'NotFoundError')     msg = '⚠️ Nem található kamera ezen az eszközön.';
+    if (e.name === 'NotAllowedError')   msg = '⚠️ Kamera engedély megtagadva. Engedélyezze a beállításokban.';
+    if (e.name === 'NotReadableError')  msg = '⚠️ A kamerát egy másik alkalmazás használja.';
+    errEl.textContent = msg;
     errEl.style.display = 'block';
-    document.getElementById('cam-hint').style.display = 'none';
+    hint.style.display = 'none';
   }
 }
 
@@ -373,25 +428,108 @@ function stopCamera() {
   if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
 }
 
-function scanFrame(vid) {
-  if (!vid.videoWidth || !vid.videoHeight) return;
-  const cvs = document.createElement('canvas');
-  cvs.width = vid.videoWidth; cvs.height = vid.videoHeight;
-  const ctx = cvs.getContext('2d');
-  ctx.drawImage(vid, 0, 0);
-  const img = ctx.getImageData(0, 0, cvs.width, cvs.height);
-  const qr  = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-  if (qr && qr.data && qr.data.trim()) {
-    stopCamera();
-    onQRFound(qr.data.trim().toUpperCase());
+// ── QR Detection: native BarcodeDetector → jsQR fallback ─────────────────
+let barcodeDetector = null;
+if ('BarcodeDetector' in window) {
+  try { barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] }); } catch(e) {}
+}
+
+const _cvs = document.createElement('canvas');
+const _ctx = _cvs.getContext('2d');
+let _scanning = false;
+
+async function scanFrame(vid) {
+  if (_scanning || !vid.videoWidth || !vid.videoHeight) return;
+  _scanning = true;
+  try {
+    if (barcodeDetector) {
+      // Native API – fastest, works great on Android Chrome
+      const codes = await barcodeDetector.detect(vid);
+      if (codes.length > 0 && codes[0].rawValue) {
+        stopCamera();
+        document.getElementById('cam-hint').textContent = '✅ QR kód olvasva!';
+        onQRFound(codes[0].rawValue.trim().toUpperCase());
+        return;
+      }
+    } else {
+      // jsQR fallback – canvas based
+      if (_cvs.width  !== vid.videoWidth)  _cvs.width  = vid.videoWidth;
+      if (_cvs.height !== vid.videoHeight) _cvs.height = vid.videoHeight;
+      _ctx.drawImage(vid, 0, 0);
+      let img;
+      try { img = _ctx.getImageData(0, 0, _cvs.width, _cvs.height); } catch(e) { _scanning = false; return; }
+      const qr = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
+      if (qr && qr.data && qr.data.trim()) {
+        stopCamera();
+        document.getElementById('cam-hint').textContent = '✅ QR kód olvasva!';
+        onQRFound(qr.data.trim().toUpperCase());
+        return;
+      }
+    }
+  } catch(e) { /* ignore frame errors */ }
+  _scanning = false;
+}
+
+// ── Photo capture decode ───────────────────────────────────────────────────
+function handlePhotoCapture(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  input.value = ''; // reset so same photo can be retaken
+
+  const hint = document.getElementById('cam-hint');
+  hint.textContent = '⏳ Feldolgozás…';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      // Draw to canvas at full res and decode
+      const cvs = document.createElement('canvas');
+      cvs.width  = img.width;
+      cvs.height = img.height;
+      const ctx  = cvs.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
+
+      // Try BarcodeDetector first (if available and supports ImageBitmap)
+      if (barcodeDetector && typeof createImageBitmap !== 'undefined') {
+        createImageBitmap(file).then(bitmap => {
+          barcodeDetector.detect(bitmap).then(codes => {
+            if (codes.length > 0 && codes[0].rawValue) {
+              onQRFound(codes[0].rawValue.trim().toUpperCase());
+            } else {
+              decodeWithJsQR(imgData, hint);
+            }
+          }).catch(() => decodeWithJsQR(imgData, hint));
+        }).catch(() => decodeWithJsQR(imgData, hint));
+      } else {
+        decodeWithJsQR(imgData, hint);
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function decodeWithJsQR(imgData, hint) {
+  if (typeof jsQR === 'undefined') {
+    if (hint) hint.textContent = '⚠️ Kód betöltése folyamatban, próbálja újra';
+    return;
+  }
+  const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+  if (code && code.data) {
+    onQRFound(code.data.trim().toUpperCase());
+  } else {
+    if (hint) hint.textContent = '❌ Nem sikerült olvasni – próbálja újra';
+    const errEl = document.getElementById('cam-error');
+    errEl.textContent = 'QR kód nem található a képen. Tartsa közelebb és próbálja újra.';
+    errEl.style.display = 'block';
+    setTimeout(() => { errEl.style.display = 'none'; hint.textContent = '📷 Tartsa a QR kártyát a keretbe'; }, 3000);
   }
 }
 
 function onQRFound(code) {
-  // Only accept codes that look like EMP-xxx
-  if (!code.startsWith('EMP-')) {
-    // Accept anyway – maybe a custom format
-  }
+  stopCamera();
   scannedQR = code;
   showPin(code);
 }
