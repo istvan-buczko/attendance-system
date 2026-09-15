@@ -25,7 +25,8 @@ app.use('/api/locations',  require('./routes/locations'));
 
 // SPA fallback – admin dashboard
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/mobile', (req, res) => res.sendFile(path.join(__dirname, 'public', 'mobile.html')));
+app.get('/mobile',  (req, res) => res.sendFile(path.join(__dirname, 'public', 'mobile.html')));
+app.get('/checkin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'checkin.html')));
 
 // Adatbázis inicializálás + szerver indítás
 initializeDatabase();

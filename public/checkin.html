@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Be-/Kilépés</title>
+<style>
+  :root {
+    --primary: #3b82f6;
+    --success: #22c55e;
+    --danger:  #ef4444;
+    --bg:      #0f172a;
+    --card:    #1e293b;
+    --surface: #334155;
+    --text:    #f1f5f9;
+    --muted:   #94a3b8;
+    --border:  #475569;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100dvh; display: flex; flex-direction: column;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .header-left { display: flex; flex-direction: column; gap: 2px; }
+  .header-loc { font-size: 16px; font-weight: 700; }
+  .header-event { font-size: 12px; font-weight: 600; letter-spacing: .5px; }
+  .event-arrival  { color: #86efac; }
+  .event-departure { color: #93c5fd; }
+  .event-unknown  { color: var(--muted); }
+  .clock { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+
+  /* ---- Main ---- */
+  .main { flex: 1; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; width: 100%; }
+
+  /* ---- Screens ---- */
+  .screen { display: none; flex-direction: column; flex: 1; }
+  .screen.active { display: flex; }
+
+  /* ---- QR Scanner ---- */
+  #screen-qr { gap: 0; }
+  .cam-wrap { position: relative; flex: 1; background: #000; overflow: hidden; }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .scan-box {
+    width: min(65vw, 260px); aspect-ratio: 1;
+    border: 3px solid var(--primary); border-radius: 14px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);
+    position: relative; overflow: hidden;
+  }
+  .scan-line {
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--primary), transparent);
+    animation: scan 1.8s ease-in-out infinite;
+  }
+  @keyframes scan { 0%{top:0} 50%{top:calc(100% - 3px)} 100%{top:0} }
+  .cam-hint {
+    margin-top: 20px; font-size: 14px; font-weight: 600; color: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+
+  .qr-footer { padding: 16px; background: var(--card); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+  #cam-error { color: #fca5a5; font-size: 13px; text-align: center; display: none; }
+  .divider { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .manual-row { display: flex; gap: 8px; }
+  #manual-qr {
+    flex: 1; padding: 11px 12px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 15px; letter-spacing: 2px; text-transform: uppercase;
+  }
+  #manual-qr::placeholder { color: var(--muted); letter-spacing: 0; text-transform: none; font-size: 13px; }
+  .btn-ok {
+    padding: 11px 18px; border-radius: 10px; background: var(--primary);
+    color: #fff; font-size: 14px; font-weight: 700; border: none; cursor: pointer;
+  }
+  .btn-ok:active { background: #2563eb; }
+
+  /* ---- PIN screen ---- */
+  #screen-pin { padding: 16px; gap: 14px; justify-content: center; }
+
+  .emp-banner {
+    background: var(--card); border-radius: 14px; padding: 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .emp-avatar {
+    width: 52px; height: 52px; border-radius: 14px;
+    background: var(--primary); display: flex; align-items: center;
+    justify-content: center; font-size: 22px; font-weight: 800; flex-shrink: 0;
+  }
+  .emp-name { font-size: 17px; font-weight: 700; }
+  .emp-dept { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .emp-qr   { font-size: 11px; color: var(--border); margin-top: 3px; font-family: monospace; }
+
+  .event-badge {
+    text-align: center; padding: 10px 16px; border-radius: 10px;
+    font-size: 14px; font-weight: 700;
+  }
+  .badge-arrival   { background: #14532d55; border: 1px solid #22c55e55; color: #86efac; }
+  .badge-departure { background: #1e3a5f55; border: 1px solid #3b82f655; color: #93c5fd; }
+  .badge-choose    { background: var(--card); border: 1px solid var(--border); color: var(--muted); }
+
+  /* Event choice buttons (if no event in URL) */
+  .event-choice { display: flex; gap: 10px; }
+  .btn-event {
+    flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700;
+    border: 2px solid transparent; cursor: pointer; background: var(--card); color: var(--text);
+    transition: all .15s;
+  }
+  .btn-event.sel-arrival  { background: #14532d; border-color: var(--success); color: #86efac; }
+  .btn-event.sel-departure{ background: #1e3a5f; border-color: var(--primary); color: #93c5fd; }
+  .btn-event:active       { opacity: .8; }
+
+  .pin-display { text-align: center; }
+  .pin-dots { display: flex; gap: 14px; justify-content: center; margin-bottom: 8px; }
+  .dot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--border); transition: all .15s; }
+  .dot.on { background: var(--primary); border-color: var(--primary); transform: scale(1.1); }
+  .pin-label { font-size: 12px; color: var(--muted); }
+
+  .pin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+  .pkey {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; font-size: 24px; font-weight: 700; cursor: pointer;
+    color: var(--text); aspect-ratio: 1.3; display: flex; align-items: center; justify-content: center;
+    transition: all .1s;
+  }
+  .pkey:active { background: var(--surface); transform: scale(.94); }
+  .pkey.del    { font-size: 18px; color: var(--muted); }
+  .pkey.ok     { background: var(--primary); border-color: var(--primary); font-size: 16px; }
+  .pkey.ok:active { background: #2563eb; }
+
+  #pin-err {
+    background: #7f1d1d44; border: 1px solid var(--danger);
+    color: #fca5a5; border-radius: 10px; padding: 10px 14px; font-size: 13px;
+    text-align: center; display: none;
+  }
+  .btn-back {
+    background: transparent; border: 1px solid var(--border); border-radius: 12px;
+    color: var(--muted); font-size: 14px; padding: 12px; cursor: pointer;
+    font-weight: 600;
+  }
+  .btn-back:active { background: var(--surface); }
+
+  /* ---- Result screen ---- */
+  #screen-result { align-items: center; justify-content: center; padding: 24px 16px; gap: 16px; }
+  .result-card {
+    width: 100%; border-radius: 20px; padding: 36px 24px;
+    text-align: center;
+  }
+  .res-success { background: linear-gradient(135deg,#14532d,#166534); border: 1px solid #22c55e44; }
+  .res-error   { background: linear-gradient(135deg,#7f1d1d,#991b1b); border: 1px solid #ef444444; }
+  .res-icon { font-size: 64px; margin-bottom: 12px; }
+  .res-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .res-msg   { color: rgba(255,255,255,.65); font-size: 14px; }
+  .res-detail {
+    margin-top: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px;
+  }
+  .res-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .res-time { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .res-date { font-size: 12px; color: rgba(255,255,255,.45); margin-top: 4px; }
+  .btn-new {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    color: var(--text); font-size: 15px; font-weight: 700; padding: 14px 32px;
+    cursor: pointer; width: 100%;
+  }
+  .btn-new:active { background: var(--surface); }
+  .auto-msg { font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-loc" id="hdr-loc">🏢 Betöltés…</div>
+    <div class="header-event event-unknown" id="hdr-event">–</div>
+  </div>
+  <div class="clock" id="clock">--:--</div>
+</div>
+
+<div class="main">
+
+  <!-- SCREEN 1: QR Scanner -->
+  <div class="screen active" id="screen-qr">
+    <div class="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="cam-overlay">
+        <div class="scan-box"><div class="scan-line"></div></div>
+        <div class="cam-hint" id="cam-hint">📷 Tartsa a QR kártyát a keretbe</div>
+      </div>
+    </div>
+    <div class="qr-footer">
+      <div id="cam-error"></div>
+      <div class="divider">vagy kézi megadás</div>
+      <div class="manual-row">
+        <input id="manual-qr" type="text" placeholder="pl. EMP-001" autocomplete="off" autocorrect="off" spellcheck="false"
+          oninput="this.value=this.value.toUpperCase()">
+        <button class="btn-ok" onclick="submitManual()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: PIN entry -->
+  <div class="screen" id="screen-pin">
+
+    <!-- Employee info (or placeholder) -->
+    <div class="emp-banner" id="emp-banner">
+      <div class="emp-avatar" id="emp-av">?</div>
+      <div>
+        <div class="emp-name" id="emp-name">Azonosítás…</div>
+        <div class="emp-dept" id="emp-dept">PIN megadása után</div>
+        <div class="emp-qr"  id="emp-qrcode"></div>
+      </div>
+    </div>
+
+    <!-- Event badge / choice -->
+    <div id="event-area"></div>
+
+    <!-- PIN dots -->
+    <div class="pin-display">
+      <div class="pin-dots">
+        <div class="dot" id="d0"></div>
+        <div class="dot" id="d1"></div>
+        <div class="dot" id="d2"></div>
+        <div class="dot" id="d3"></div>
+      </div>
+      <div class="pin-label">Adja meg PIN kódját</div>
+    </div>
+
+    <!-- PIN numpad -->
+    <div class="pin-grid">
+      <button class="pkey" onclick="pk('1')">1</button>
+      <button class="pkey" onclick="pk('2')">2</button>
+      <button class="pkey" onclick="pk('3')">3</button>
+      <button class="pkey" onclick="pk('4')">4</button>
+      <button class="pkey" onclick="pk('5')">5</button>
+      <button class="pkey" onclick="pk('6')">6</button>
+      <button class="pkey" onclick="pk('7')">7</button>
+      <button class="pkey" onclick="pk('8')">8</button>
+      <button class="pkey" onclick="pk('9')">9</button>
+      <button class="pkey del" onclick="pdel()">⌫</button>
+      <button class="pkey" onclick="pk('0')">0</button>
+      <button class="pkey ok" onclick="submitPin()">✓</button>
+    </div>
+
+    <div id="pin-err"></div>
+    <button class="btn-back" onclick="backToQR()">← Vissza / QR újraolvasás</button>
+  </div>
+
+  <!-- SCREEN 3: Result -->
+  <div class="screen" id="screen-result">
+    <div class="result-card" id="res-card">
+      <div class="res-icon" id="res-icon">✅</div>
+      <div class="res-title" id="res-title">Sikeres</div>
+      <div class="res-msg"   id="res-msg"></div>
+      <div class="res-detail" id="res-detail" style="display:none">
+        <div class="res-name" id="res-name"></div>
+        <div class="res-time" id="res-time"></div>
+        <div class="res-date" id="res-date"></div>
+      </div>
+    </div>
+    <button class="btn-new" onclick="restart()">← Új azonosítás</button>
+    <div class="auto-msg" id="auto-msg"></div>
+  </div>
+
+</div><!-- .main -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const API = window.location.origin;
+
+let params       = new URLSearchParams(window.location.search);
+let locationId   = null;
+let locationName = params.get('loc') || params.get('location') || params.get('telephely') || '';
+let eventType    = (params.get('event') || params.get('esemeny') || '').toLowerCase(); // 'arrival'|'departure'|''
+let scannedQR    = '';
+let pin          = '';
+let videoStream  = null;
+let scanTimer    = null;
+let autoTimer    = null;
+let chosenEvent  = eventType; // may be overridden by button
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+(function tick() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    n.toLocaleTimeString('hu-HU', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  setTimeout(tick, 1000);
+})();
+
+// ── Location init ──────────────────────────────────────────────────────────
+async function initLocation() {
+  const el = document.getElementById('hdr-loc');
+  const ev = document.getElementById('hdr-event');
+
+  // Event label
+  if (eventType === 'arrival') {
+    ev.textContent = '✅ Érkezés';
+    ev.className = 'header-event event-arrival';
+    chosenEvent = 'arrival';
+  } else if (eventType === 'departure') {
+    ev.textContent = '🚪 Távozás';
+    ev.className = 'header-event event-departure';
+    chosenEvent = 'departure';
+  } else {
+    ev.textContent = 'Érkezés / Távozás';
+    ev.className = 'header-event event-unknown';
+    chosenEvent = '';
+  }
+
+  if (!locationName) { el.textContent = '🏢 Jelenlét Terminál'; return; }
+
+  el.textContent = '🏢 ' + locationName;
+  document.title = 'Terminál – ' + locationName;
+
+  // Try to resolve name from API
+  try {
+    const res  = await fetch(`${API}/api/locations/public`);
+    if (!res.ok) return;
+    const locs = await res.json();
+    const loc  = locs.find(l =>
+      l.code === locationName || l._id === locationName ||
+      l.name.toLowerCase() === locationName.toLowerCase()
+    );
+    if (loc) {
+      locationId   = loc._id;
+      locationName = loc.name;
+      el.textContent  = '🏢 ' + loc.name;
+      document.title  = 'Terminál – ' + loc.name;
+    }
+  } catch(e) { /* offline / API not available */ }
+}
+
+// ── Camera / QR ────────────────────────────────────────────────────────────
+async function startCamera() {
+  const errEl = document.getElementById('cam-error');
+  errEl.style.display = 'none';
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const vid = document.getElementById('video');
+    vid.srcObject = videoStream;
+    await vid.play();
+    vid.addEventListener('loadedmetadata', () => {
+      scanTimer = setInterval(() => scanFrame(vid), 200);
+    });
+  } catch(e) {
+    errEl.textContent = '⚠️ Kamera hozzáférés megtagadva – használja a kézi bevitelt alul.';
+    errEl.style.display = 'block';
+    document.getElementById('cam-hint').style.display = 'none';
+  }
+}
+
+function stopCamera() {
+  clearInterval(scanTimer); scanTimer = null;
+  if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+}
+
+function scanFrame(vid) {
+  if (!vid.videoWidth || !vid.videoHeight) return;
+  const cvs = document.createElement('canvas');
+  cvs.width = vid.videoWidth; cvs.height = vid.videoHeight;
+  const ctx = cvs.getContext('2d');
+  ctx.drawImage(vid, 0, 0);
+  const img = ctx.getImageData(0, 0, cvs.width, cvs.height);
+  const qr  = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+  if (qr && qr.data && qr.data.trim()) {
+    stopCamera();
+    onQRFound(qr.data.trim().toUpperCase());
+  }
+}
+
+function onQRFound(code) {
+  // Only accept codes that look like EMP-xxx
+  if (!code.startsWith('EMP-')) {
+    // Accept anyway – maybe a custom format
+  }
+  scannedQR = code;
+  showPin(code);
+}
+
+function submitManual() {
+  const v = document.getElementById('manual-qr').value.trim().toUpperCase();
+  if (!v) return;
+  document.getElementById('manual-qr').value = '';
+  stopCamera();
+  onQRFound(v);
+}
+
+// ── PIN screen ─────────────────────────────────────────────────────────────
+function showPin(qrCode) {
+  pin = '';
+  updateDots();
+  hidePinErr();
+
+  // Employee info placeholder
+  document.getElementById('emp-av').textContent   = '?';
+  document.getElementById('emp-name').textContent = 'Azonosítás…';
+  document.getElementById('emp-dept').textContent = 'PIN megadása után';
+  document.getElementById('emp-qrcode').textContent = qrCode;
+
+  // Event area
+  renderEventArea();
+
+  showScreen('screen-pin');
+}
+
+function renderEventArea() {
+  const area = document.getElementById('event-area');
+  if (chosenEvent === 'arrival') {
+    area.innerHTML = '<div class="event-badge badge-arrival">✅ Érkezés – ' + (locationName || 'Telephely') + '</div>';
+  } else if (chosenEvent === 'departure') {
+    area.innerHTML = '<div class="event-badge badge-departure">🚪 Távozás – ' + (locationName || 'Telephely') + '</div>';
+  } else {
+    // Let employee choose
+    area.innerHTML = `
+      <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:4px">Érkezés vagy távozás?</div>
+      <div class="event-choice">
+        <button class="btn-event" id="btn-arr" onclick="pickEvent('arrival')">✅ Érkezés</button>
+        <button class="btn-event" id="btn-dep" onclick="pickEvent('departure')">🚪 Távozás</button>
+      </div>`;
+  }
+}
+
+function pickEvent(e) {
+  chosenEvent = e;
+  document.getElementById('btn-arr')?.classList.toggle('sel-arrival',   e === 'arrival');
+  document.getElementById('btn-dep')?.classList.toggle('sel-departure', e === 'departure');
+}
+
+function pk(d) {
+  if (pin.length >= 8) return;
+  pin += d;
+  updateDots();
+}
+function pdel() { pin = pin.slice(0,-1); updateDots(); }
+function updateDots() {
+  for (let i = 0; i < 4; i++)
+    document.getElementById('d'+i).classList.toggle('on', i < pin.length);
+}
+
+async function submitPin() {
+  if (pin.length < 4) { showPinErr('Legalább 4 számjegy szükséges'); return; }
+  if (!chosenEvent)   { showPinErr('Válasszon: Érkezés vagy Távozás'); return; }
+
+  hidePinErr();
+
+  // Determine tagType for API
+  const tagType = chosenEvent === 'arrival' ? 'entry' : 'exit';
+
+  const body = {
+    qrCode:       scannedQR,
+    pin:          pin,
+    locationId:   locationId   || null,
+    locationName: locationName || null,
+    tagType:      tagType,
+  };
+
+  try {
+    const res  = await fetch(`${API}/api/attendance/identify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    pin = ''; updateDots();
+    if (res.ok) showResult(true, data);
+    else        showResult(false, data);
+  } catch(e) {
+    showPinErr('Kapcsolódási hiba. Ellenőrizze a hálózatot.');
+  }
+}
+
+function showPinErr(msg) {
+  const el = document.getElementById('pin-err');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(hidePinErr, 3500);
+}
+function hidePinErr() {
+  document.getElementById('pin-err').style.display = 'none';
+}
+
+// ── Result screen ──────────────────────────────────────────────────────────
+function showResult(ok, data) {
+  const card = document.getElementById('res-card');
+  card.className = 'result-card ' + (ok ? 'res-success' : 'res-error');
+
+  if (ok) {
+    const isIn = data.eventType === 'checkin';
+    document.getElementById('res-icon').textContent  = isIn ? '✅' : '🚪';
+    document.getElementById('res-title').textContent = data.message || (isIn ? 'Érkezés rögzítve' : 'Távozás rögzítve');
+    document.getElementById('res-msg').textContent   = '';
+    if (data.employee) {
+      const t = new Date(data.timestamp);
+      document.getElementById('res-name').textContent = data.employee.name + (data.employee.department ? ' – ' + data.employee.department : '');
+      document.getElementById('res-time').textContent = t.toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('res-date').textContent = t.toLocaleDateString('hu-HU',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+      document.getElementById('res-detail').style.display = 'block';
+    } else {
+      document.getElementById('res-detail').style.display = 'none';
+    }
+    // Auto-reset in 5 s
+    startAutoReset(5);
+  } else {
+    document.getElementById('res-icon').textContent  = '❌';
+    document.getElementById('res-title').textContent = 'Sikertelen azonosítás';
+    document.getElementById('res-msg').textContent   = data.error || 'Helytelen PIN vagy QR kód.';
+    document.getElementById('res-detail').style.display = 'none';
+    // Auto-reset in 8 s back to PIN so they can retry
+    startAutoReset(8, true);
+  }
+  showScreen('screen-result');
+}
+
+function startAutoReset(secs, backToPin = false) {
+  clearTimeout(autoTimer);
+  let remaining = secs;
+  const msg = document.getElementById('auto-msg');
+  function tick() {
+    msg.textContent = `Automatikus visszaállítás ${remaining} másodperc múlva…`;
+    if (remaining-- <= 0) { backToPin ? retry() : restart(); return; }
+    autoTimer = setTimeout(tick, 1000);
+  }
+  tick();
+}
+
+function retry() {
+  clearTimeout(autoTimer);
+  document.getElementById('auto-msg').textContent = '';
+  pin = ''; updateDots(); hidePinErr();
+  renderEventArea();
+  showScreen('screen-pin');
+}
+
+function restart() {
+  clearTimeout(autoTimer);
+  document.getElementById('auto-msg').textContent = '';
+  scannedQR = '';
+  pin = '';
+  // Reset event choice to URL default
+  chosenEvent = eventType;
+  document.getElementById('manual-qr').value = '';
+  showScreen('screen-qr');
+  startCamera();
+}
+
+function backToQR() {
+  scannedQR = '';
+  pin = '';
+  document.getElementById('manual-qr').value = '';
+  showScreen('screen-qr');
+  startCamera();
+}
+
+// ── Screen navigation ──────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Keyboard support ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const active = document.querySelector('.screen.active')?.id;
+  if (active === 'screen-pin') {
+    if (e.key >= '0' && e.key <= '9') pk(e.key);
+    else if (e.key === 'Backspace') pdel();
+    else if (e.key === 'Enter') submitPin();
+  }
+  if (active === 'screen-qr' && e.key === 'Enter') submitManual();
+});
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+initLocation().then(startCamera);
+</script>
+</body>
+</html>
