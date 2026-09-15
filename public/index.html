@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Jelenlét Nyilvántartó – Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root {
     --primary: #2563eb; --primary-dark: #1d4ed8; --primary-light: #dbeafe;
@@ -961,11 +962,16 @@ async function delNfc(id) { if(!confirm('Törlöd?'))return; await api(`/api/nfc
 function showQR(code, name) {
   document.getElementById('qr-text').textContent=code;
   document.getElementById('qr-name').textContent=name;
-  let h=0; for(let c of code) h=(h*31+c.charCodeAt(0))&0xffffffff;
-  const s=10; let svg='';
-  [[0,0],[0,7],[7,0]].forEach(([cx,cy])=>{svg+=`<rect x="${cx}" y="${cy}" width="3" height="3" fill="#000"/>`;svg+=`<rect x="${cx+.5}" y="${cy+.5}" width="2" height="2" fill="#fff"/>`;svg+=`<rect x="${cx+1}" y="${cy+1}" width="1" height="1" fill="#000"/>`;});
-  for(let y=0;y<s;y++) for(let x=0;x<s;x++){if((x<4&&y<4)||(x>5&&y<4)||(x<4&&y>5))continue;if((h>>((y*s+x)%32))&1)svg+=`<rect x="${x}" y="${y}" width="1" height="1" fill="#000"/>`;}
-  document.getElementById('qr-svg').innerHTML=`<svg width="180" height="180" viewBox="0 0 ${s} ${s}" style="border:3px solid #000;display:block;margin:auto;image-rendering:pixelated">${svg}</svg>`;
+  const container=document.getElementById('qr-svg');
+  container.innerHTML='';
+  new QRCode(container, {
+    text: code,
+    width: 200,
+    height: 200,
+    colorDark: '#000000',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
   document.getElementById('qr-modal').style.display='flex';
 }
 
