@@ -117,5 +117,3 @@ function initializeDatabase() {
   //   seedEmployees(locs);
   // });
 }
-
-module.exports = { db, initializeDatabase };
