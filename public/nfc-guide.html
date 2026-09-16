@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFC Programozási Útmutató</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root {
+  --primary:#3b82f6; --success:#22c55e; --danger:#ef4444;
+  --bg:#0f172a; --card:#1e293b; --surface:#334155;
+  --text:#f1f5f9; --muted:#94a3b8; --border:#475569;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+/* ── Login overlay ── */
+#login-overlay{
+  position:fixed;inset:0;background:var(--bg);display:flex;
+  align-items:center;justify-content:center;z-index:100;
+}
+.login-box{background:var(--card);border-radius:16px;padding:32px;width:320px;display:flex;flex-direction:column;gap:14px}
+.login-box h2{font-size:18px;font-weight:700;text-align:center}
+.inp{padding:11px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:15px;width:100%}
+.btn{padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;width:100%}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:active{background:#2563eb}
+.err{color:#fca5a5;font-size:13px;text-align:center;display:none}
+
+/* ── Main layout ── */
+#app{display:none}
+.topbar{
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:10;
+}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn-sm{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+.btn-blue{background:var(--primary);color:#fff}
+.btn-green{background:var(--success);color:#fff}
+.btn-gray{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+
+/* ── Import panel ── */
+#import-panel{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin:16px 20px;display:none;
+}
+#import-panel h3{font-size:15px;font-weight:700;margin-bottom:12px}
+.import-note{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+.import-note code{background:var(--surface);padding:2px 6px;border-radius:4px;font-size:11px}
+#csv-area{
+  width:100%;min-height:160px;padding:12px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--text);font-family:monospace;font-size:12px;resize:vertical;
+}
+.import-actions{display:flex;gap:8px;margin-top:10px}
+#import-result{margin-top:10px;font-size:13px;padding:10px 14px;border-radius:8px;display:none}
+.res-ok{background:#14532d55;border:1px solid #22c55e55;color:#86efac}
+.res-err{background:#7f1d1d55;border:1px solid #ef444455;color:#fca5a5}
+
+/* ── Stats bar ── */
+.stats-bar{
+  display:flex;gap:12px;padding:12px 20px;flex-wrap:wrap;
+}
+.stat-chip{
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:8px 14px;font-size:13px;
+}
+.stat-chip span{font-weight:700;color:var(--primary)}
+
+/* ── Search & filter ── */
+.filter-bar{padding:0 20px 12px;display:flex;gap:8px;flex-wrap:wrap}
+.search-inp{
+  flex:1;min-width:200px;padding:9px 12px;border-radius:8px;
+  background:var(--card);border:1px solid var(--border);color:var(--text);font-size:14px;
+}
+
+/* ── Location grid ── */
+.loc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;padding:0 20px 40px}
+.loc-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.loc-header{
+  padding:14px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+}
+.loc-code{font-size:11px;font-weight:700;color:var(--primary);font-family:monospace;letter-spacing:1px}
+.loc-name{font-size:15px;font-weight:700;margin:2px 0}
+.loc-meta{font-size:12px;color:var(--muted)}
+.badge-active{background:#14532d55;color:#86efac;border:1px solid #22c55e44;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0}
+.badge-inactive{background:#7f1d1d55;color:#fca5a5;border:1px solid #ef444444;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0}
+
+.nfc-rows{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.nfc-row{background:var(--surface);border-radius:10px;padding:10px 12px}
+.nfc-row-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.nfc-label{font-size:11px;font-weight:700;letter-spacing:.5px}
+.label-arrival{color:#86efac}
+.label-departure{color:#93c5fd}
+.url-text{font-size:10px;color:var(--muted);font-family:monospace;word-break:break-all;margin-bottom:6px;line-height:1.5}
+.copy-btn{
+  font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;
+  background:var(--primary);color:#fff;border:none;cursor:pointer;flex-shrink:0;
+}
+.copy-btn:active{background:#2563eb}
+.qr-wrap{display:flex;gap:12px;justify-content:center;margin-top:8px}
+.qr-item{text-align:center}
+.qr-item canvas,.qr-item img{border-radius:6px;background:#fff;padding:4px}
+.qr-item p{font-size:10px;color:var(--muted);margin-top:4px}
+
+/* ── Print styles ── */
+@media print {
+  body{background:#fff;color:#000}
+  #login-overlay,#import-panel,.topbar,.filter-bar,.stats-bar{display:none!important}
+  .loc-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:8px}
+  .loc-card{border:1px solid #ccc;break-inside:avoid}
+  .loc-header{background:#f8f8f8}
+  .loc-name{color:#000}
+  .loc-code{color:#333}
+  .loc-meta{color:#555}
+  .nfc-row{background:#f0f0f0}
+  .nfc-label{color:#000}
+  .label-arrival{color:#166534}
+  .label-departure{color:#1e40af}
+  .url-text{color:#333}
+  .copy-btn{display:none}
+  .badge-active{background:#dcfce7;color:#166534;border-color:#86efac}
+  .badge-inactive{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+  #app{display:block!important}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-overlay">
+  <div class="login-box">
+    <h2>🔐 Admin belépés</h2>
+    <input class="inp" type="email"    id="li-email" placeholder="E-mail" value="admin@company.hu">
+    <input class="inp" type="password" id="li-pass"  placeholder="Jelszó">
+    <button class="btn btn-primary" onclick="doLogin()">Belépés</button>
+    <div class="err" id="li-err">Hibás adatok</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <h1>📡 NFC Programozási Útmutató</h1>
+    <div class="topbar-actions">
+      <button class="btn-sm btn-green" onclick="toggleImport()">📥 CSV Import</button>
+      <button class="btn-sm btn-blue"  onclick="window.print()">🖨️ Nyomtatás</button>
+      <button class="btn-sm btn-gray"  onclick="window.location='/'">← Admin</button>
+    </div>
+  </div>
+
+  <!-- IMPORT PANEL -->
+  <div id="import-panel">
+    <h3>📥 Telephelyek tömeges importja (CSV)</h3>
+    <div class="import-note">
+      Formátum (fejléc kötelező): <code>Kód,Telephely neve,Város,Cím,Felelős</code><br>
+      Példa:<br>
+      <code>GYR-01,Győr – Telephely,Győr,Árpád u. 8.,Kiss András</code><br>
+      <code>BP-01,Budapest – Központ,Budapest,Váci út 1.,Nagy Péter</code><br><br>
+      Megjegyzés: ha a kód már létezik, az a sor ki lesz hagyva (nem felülírja).
+    </div>
+    <textarea id="csv-area" placeholder="Másolja ide a CSV tartalmat…"></textarea>
+    <div class="import-actions">
+      <button class="btn btn-primary" onclick="runImport()">📥 Importálás</button>
+      <button class="btn btn-gray"    onclick="document.getElementById('csv-area').value=csvExample()">📋 Minta betöltése</button>
+      <button class="btn btn-gray"    onclick="toggleImport()">Mégse</button>
+    </div>
+    <div id="import-result"></div>
+  </div>
+
+  <div class="stats-bar" id="stats-bar"></div>
+
+  <div class="filter-bar">
+    <input class="search-inp" id="search" placeholder="🔍 Keresés telephely neve, kód, város szerint…" oninput="renderLocations()">
+  </div>
+
+  <div class="loc-grid" id="loc-grid">
+    <div style="padding:40px;text-align:center;color:var(--muted)">Betöltés…</div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let token = sessionStorage.getItem('nfc_token') || '';
+let allLocations = [];
+
+// ── Login ──────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('li-email').value.trim();
+  const pass  = document.getElementById('li-pass').value;
+  try {
+    const res  = await fetch(`${API}/api/auth/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (!res.ok) { document.getElementById('li-err').style.display='block'; return; }
+    token = data.token;
+    sessionStorage.setItem('nfc_token', token);
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadLocations();
+  } catch(e) {
+    document.getElementById('li-err').style.display = 'block';
+  }
+}
+
+// Auto-login if token saved
+if (token) {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadLocations();
+}
+
+document.getElementById('li-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── Load locations ─────────────────────────────────────────────────────────
+async function loadLocations() {
+  try {
+    const res  = await fetch(`${API}/api/locations`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (res.status === 401) { token=''; sessionStorage.removeItem('nfc_token'); location.reload(); return; }
+    allLocations = await res.json();
+    renderStats();
+    renderLocations();
+  } catch(e) {
+    document.getElementById('loc-grid').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">Kapcsolódási hiba</div>';
+  }
+}
+
+function renderStats() {
+  const active = allLocations.filter(l => l.active).length;
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat-chip">Összes: <span>${allLocations.length}</span></div>
+    <div class="stat-chip">Aktív: <span>${active}</span></div>
+    <div class="stat-chip">Inaktív: <span>${allLocations.length - active}</span></div>
+    <div class="stat-chip">NFC tag-ek szükséges: <span>${active * 2}</span> (érk. + táv.)</div>
+  `;
+}
+
+function renderLocations() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const filtered = q
+    ? allLocations.filter(l =>
+        (l.name||'').toLowerCase().includes(q) ||
+        (l.code||'').toLowerCase().includes(q)  ||
+        (l.city||'').toLowerCase().includes(q))
+    : allLocations;
+
+  if (filtered.length === 0) {
+    document.getElementById('loc-grid').innerHTML =
+      '<div style="padding:40px;text-align:center;color:var(--muted)">Nincs találat</div>';
+    return;
+  }
+
+  document.getElementById('loc-grid').innerHTML =
+    filtered.map(l => locationCard(l)).join('');
+
+  // Generate QR codes
+  filtered.forEach(l => {
+    generateQR('qr-arr-' + l._id, arrUrl(l));
+    generateQR('qr-dep-' + l._id, depUrl(l));
+  });
+}
+
+// ── URL helpers ────────────────────────────────────────────────────────────
+function locCode(l) {
+  return encodeURIComponent((l.code || l._id).toLowerCase());
+}
+function arrUrl(l) {
+  return `${API}/checkin?loc=${locCode(l)}&event=arrival`;
+}
+function depUrl(l) {
+  return `${API}/checkin?loc=${locCode(l)}&event=departure`;
+}
+
+// ── Card HTML ──────────────────────────────────────────────────────────────
+function locationCard(l) {
+  const badge = l.active
+    ? '<span class="badge-active">Aktív</span>'
+    : '<span class="badge-inactive">Inaktív</span>';
+  const meta = [l.city, l.address, l.manager].filter(Boolean).join(' · ');
+  return `
+  <div class="loc-card">
+    <div class="loc-header">
+      <div>
+        <div class="loc-code">${l.code || '–'}</div>
+        <div class="loc-name">${l.name}</div>
+        ${meta ? `<div class="loc-meta">${meta}</div>` : ''}
+      </div>
+      ${badge}
+    </div>
+    <div class="nfc-rows">
+      <!-- Arrival -->
+      <div class="nfc-row">
+        <div class="nfc-row-header">
+          <span class="nfc-label label-arrival">✅ ÉRKEZÉS – NFC URL</span>
+          <button class="copy-btn" onclick="copyUrl('${arrUrl(l)}', this)">Másolás</button>
+        </div>
+        <div class="url-text">${arrUrl(l)}</div>
+        <div class="qr-wrap"><div class="qr-item"><div id="qr-arr-${l._id}"></div><p>Érkezés</p></div></div>
+      </div>
+      <!-- Departure -->
+      <div class="nfc-row">
+        <div class="nfc-row-header">
+          <span class="nfc-label label-departure">🚪 TÁVOZÁS – NFC URL</span>
+          <button class="copy-btn" onclick="copyUrl('${depUrl(l)}', this)">Másolás</button>
+        </div>
+        <div class="url-text">${depUrl(l)}</div>
+        <div class="qr-wrap"><div class="qr-item"><div id="qr-dep-${l._id}"></div><p>Távozás</p></div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── QR generation ──────────────────────────────────────────────────────────
+function generateQR(containerId, text) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  new QRCode(el, { text, width:100, height:100, correctLevel: QRCode.CorrectLevel.M });
+}
+
+// ── Copy URL ───────────────────────────────────────────────────────────────
+function copyUrl(url, btn) {
+  navigator.clipboard.writeText(url).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Másolva';
+    btn.style.background = 'var(--success)';
+    setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+  });
+}
+
+// ── Import ─────────────────────────────────────────────────────────────────
+function toggleImport() {
+  const p = document.getElementById('import-panel');
+  p.style.display = p.style.display === 'none' || !p.style.display ? 'block' : 'none';
+}
+
+function csvExample() {
+  return `Kód,Telephely neve,Város,Cím,Felelős
+GYR-01,Győr – Telephely,Győr,Árpád u. 8.,Kiss András
+GYR-02,Győr – Raktár,Győr,Ipar u. 12.,Nagy Béla
+BP-01,Budapest – Központ,Budapest,Váci út 1.,Kovács Éva
+BP-02,Budapest – Iroda,Budapest,Andrássy út 5.,Tóth Péter`;
+}
+
+async function runImport() {
+  const raw = document.getElementById('csv-area').value.trim();
+  if (!raw) return;
+
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return showImportResult(false, 'Legalább egy adatsor szükséges a fejléc után.');
+
+  // Parse CSV (simple, handles quoted fields too)
+  const header = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim());
+  const locations = lines.slice(1).map(line => {
+    const cols = parseCsvLine(line);
+    const row = {};
+    header.forEach((h, i) => { row[h] = (cols[i] || '').trim(); });
+    return {
+      code:    row['kód']          || row['code']    || '',
+      name:    row['telephely neve']|| row['name']    || row['név'] || '',
+      city:    row['város']        || row['city']    || '',
+      address: row['cím']          || row['address'] || '',
+      manager: row['felelős']      || row['manager'] || '',
+    };
+  }).filter(r => r.name);
+
+  if (locations.length === 0)
+    return showImportResult(false, 'Nem sikerült értelmezni az adatsorokat. Ellenőrizze a formátumot.');
+
+  try {
+    const res  = await fetch(`${API}/api/locations/import`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+token},
+      body: JSON.stringify({ locations })
+    });
+    const data = await res.json();
+    if (!res.ok) return showImportResult(false, data.error || 'Hiba');
+    showImportResult(true,
+      `✅ Sikeresen importálva: ${data.inserted} telephely. ` +
+      (data.skipped > 0 ? `Kihagyva (már létező kód): ${data.skipped}.` : '') +
+      (data.errors?.length > 0 ? ` Hibák: ${data.errors.join(', ')}` : '')
+    );
+    loadLocations();
+  } catch(e) {
+    showImportResult(false, 'Kapcsolódási hiba: ' + e.message);
+  }
+}
+
+function parseCsvLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function showImportResult(ok, msg) {
+  const el = document.getElementById('import-result');
+  el.className = ok ? 'res-ok' : 'res-err';
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>

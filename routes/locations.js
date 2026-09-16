@@ -26,6 +26,42 @@ router.get('/:id', authenticateToken, (req, res) => {
   });
 });
 
+// POST /api/locations/import – tömeges CSV import
+router.post('/import', authenticateToken, (req, res) => {
+  const rows = req.body.locations;
+  if (!Array.isArray(rows) || rows.length === 0)
+    return res.status(400).json({ error: 'Üres lista' });
+
+  let inserted = 0, skipped = 0, errors = [];
+
+  const next = (i) => {
+    if (i >= rows.length) return res.json({ inserted, skipped, errors });
+    const r = rows[i];
+    if (!r.name) { skipped++; return next(i + 1); }
+    const loc = {
+      code:    (r.code    || '').trim().toUpperCase(),
+      name:    (r.name    || '').trim(),
+      city:    (r.city    || '').trim(),
+      address: (r.address || '').trim(),
+      manager: (r.manager || '').trim(),
+      phone:   (r.phone   || '').trim(),
+      email:   (r.email   || '').trim(),
+      active:  r.active !== false,
+      createdAt: new Date().toISOString()
+    };
+    // Skip if code already exists
+    db.locations.findOne({ code: loc.code }, (err, existing) => {
+      if (existing) { skipped++; return next(i + 1); }
+      db.locations.insert(loc, (err2, doc) => {
+        if (err2) { errors.push(loc.code + ': ' + err2.message); }
+        else inserted++;
+        next(i + 1);
+      });
+    });
+  };
+  next(0);
+});
+
 // POST /api/locations
 router.post('/', authenticateToken, (req, res) => {
   const { code, name, city, address, manager, phone, email } = req.body;

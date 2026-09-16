@@ -353,9 +353,11 @@ async function initLocation() {
     const res  = await fetch(`${API}/api/locations/public`);
     if (!res.ok) return;
     const locs = await res.json();
+    const q = locationName.toLowerCase();
     const loc  = locs.find(l =>
-      l.code === locationName || l._id === locationName ||
-      l.name.toLowerCase() === locationName.toLowerCase()
+      (l.code || '').toLowerCase() === q ||
+      l._id === locationName ||
+      (l.name || '').toLowerCase() === q
     );
     if (loc) {
       locationId   = loc._id;
