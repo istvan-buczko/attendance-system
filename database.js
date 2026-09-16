@@ -110,12 +110,12 @@ function seedEmployees(locations) {
 
 function initializeDatabase() {
   seedAdmin();
-  // Telephelyek először, utána NFC + dolgozók (hogy legyen locationId)
-  seedLocations((err, locations) => {
-    const locs = Array.isArray(err) ? err : (locations || []); // cb(inserted) esetén err = array
-    seedNfcTags(locs);
-    seedEmployees(locs);
-  });
+  // Demo adatok seedelése ki van kapcsolva (éles rendszer)
+  // seedLocations((err, locations) => {
+  //   const locs = Array.isArray(err) ? err : (locations || []);
+  //   seedNfcTags(locs);
+  //   seedEmployees(locs);
+  // });
 }
 
 module.exports = { db, initializeDatabase };
